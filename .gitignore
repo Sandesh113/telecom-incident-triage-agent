@@ -1,0 +1,22 @@
+# Terraform
+infra/.terraform/
+infra/.build/
+infra/*.tfstate
+infra/*.tfstate.*
+infra/terraform.tfvars
+infra/crash.log
+
+# Python / misc
+__pycache__/
+*.pyc
+.venv/
+.env
+runs/
+landing/
+demo-evidence/
+docs/INTERVIEW_PREP.md
+
+# Build artefacts and plans
+.build/
+infra/tfplan*
+infra/.terraform.tfstate.lock.info

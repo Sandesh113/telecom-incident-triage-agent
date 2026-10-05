@@ -1,0 +1,463 @@
+<title>Incident Triage Walkthrough</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<style>
+  /* Layout concept: left-to-right pipeline with AgentCore as the hub; Bedrock above, S3/DynamoDB/SNS below. Dark NOC-console palette. */
+  :root{
+    --bg:#0a0e14; --panel:#111823; --panel-2:#0d131c; --fg:#e8edf4; --muted:#8a96a8;
+    --line:#2a3444; --accent:#56e0c6; --accent-dim:#2a5f55; --active:#ffb454; --active-dim:#4a3a20;
+    color-scheme: dark;
+    --font-display:'IBM Plex Mono',ui-monospace,Menlo,Consolas,monospace;
+    --font-body:'IBM Plex Sans',ui-sans-serif,system-ui,sans-serif;
+  }
+  *{box-sizing:border-box}
+  body{background:var(--bg);color:var(--fg);font-family:var(--font-body);margin:0;padding-inline:16px;padding-block:28px}
+  .wrap{max-width:1100px;margin:0 auto;display:flex;flex-direction:column;gap:18px}
+  header{display:flex;flex-direction:column;gap:6px}
+  .eyebrow{font-family:var(--font-display);font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--accent)}
+  h1{font-family:var(--font-display);font-size:clamp(20px,3vw,28px);margin:0;font-weight:600;text-wrap:balance}
+  .sub{color:var(--muted);font-size:14px;max-width:62ch;margin:0}
+
+  .stage{background:var(--panel);border:1px solid var(--line);border-radius:10px;overflow:hidden}
+  .stage-inner{position:relative;width:100%}
+  svg{display:block;width:100%;height:auto}
+
+  .cap-bar{display:flex;align-items:center;gap:14px;padding:14px 18px;border-top:1px solid var(--line);background:var(--panel-2);min-height:28px}
+  .cap-text{font-size:15px;line-height:1.5;flex:1;min-width:0}
+  .cap-text .step-no{font-family:var(--font-display);color:var(--accent);margin-right:8px;font-size:13px}
+  .cap-text.idle{color:var(--muted);font-style:italic}
+
+  .controls{display:flex;flex-wrap:wrap;gap:10px;align-items:center}
+  button{font-family:var(--font-body);font-size:13px;font-weight:500;border:1px solid var(--line);background:var(--panel-2);color:var(--fg);padding:9px 16px;border-radius:7px;cursor:pointer;transition:border-color .15s,background .15s}
+  button:hover{border-color:var(--accent)}
+  button:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+  button.primary{background:var(--accent);color:#07130f;border-color:var(--accent)}
+  button.primary:hover{background:#6fe9d2}
+  button:disabled{opacity:.4;cursor:not-allowed}
+  .muted-toggle{display:flex;align-items:center;gap:7px;font-size:13px;color:var(--muted);margin-left:auto}
+
+  .progress{display:flex;gap:5px}
+  .progress i{list-style:none;width:22px;height:4px;border-radius:2px;background:var(--line);display:block}
+  .progress i.done{background:var(--accent-dim)}
+  .progress i.now{background:var(--accent)}
+
+  details{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:0}
+  summary{cursor:pointer;padding:14px 18px;font-family:var(--font-display);font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);user-select:none}
+  summary:hover{color:var(--fg)}
+  .script{padding:0 18px 18px;display:flex;flex-direction:column;gap:10px}
+  .script p{margin:0;font-size:14px;line-height:1.6;padding:10px 12px;background:var(--panel-2);border-left:2px solid var(--line);border-radius:4px}
+  .script p .n{font-family:var(--font-display);color:var(--accent);margin-right:8px;font-size:12px}
+  .copy-row{display:flex;justify-content:flex-end}
+
+  footer{color:var(--muted);font-size:12px;text-align:center;padding-top:4px}
+
+  @media (max-width:560px){
+    .cap-bar{flex-direction:column;align-items:stretch;gap:10px}
+    .muted-toggle{margin-left:0}
+  }
+  @media (prefers-reduced-motion: reduce){
+    * { transition-duration: 0.01ms !important; }
+  }
+</style>
+
+<div class="wrap">
+  <header>
+    <span class="eyebrow">sop-rca &middot; AWS reference architecture</span>
+    <h1>Incident Triage Pipeline Walkthrough</h1>
+    <p class="sub">How one network alarm travels from EventBridge to a cited root-cause report, narrated step by step. Press play, then screen-record this panel.</p>
+  </header>
+
+  <div class="stage">
+    <div class="stage-inner">
+      <svg id="diagram" viewBox="0 0 1200 660" role="img" aria-label="Pipeline diagram: an incident event moves from EventBridge through a Lambda shim into Bedrock AgentCore, which reads SOP knowledge from S3, reasons with a Bedrock model, checks DynamoDB evidence, writes a report to S3, and notifies an engineer through SNS.">
+        <defs>
+          <marker id="arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+            <path d="M0,0 L10,5 L0,10 z" fill="currentColor"/>
+          </marker>
+        </defs>
+
+        <!-- edges (drawn first, under nodes) -->
+        <g id="edges" fill="none" stroke="#3a4558" stroke-width="2">
+          <path id="edge-1" data-label="alarm" d="M140,460 L260,460" marker-end="url(#arrow)"/>
+          <path id="edge-2" data-label="EventBridge|rule" d="M360,460 L460,460" marker-end="url(#arrow)"/>
+          <path id="edge-3" data-label="Invoke|AgentRuntime" d="M560,460 L660,460" marker-end="url(#arrow)"/>
+          <path id="edge-4a" data-label="GetObject" d="M760,440 C800,380 800,300 760,250" marker-end="url(#arrow)"/>
+          <path id="edge-4b" d="M760,250 C800,300 800,380 760,440" marker-end="url(#arrow)" stroke-dasharray="3 5"/>
+          <path id="edge-5a" data-label="Invoke|Model" d="M810,400 L900,300" marker-end="url(#arrow)"/>
+          <path id="edge-5b" d="M900,300 L810,400" marker-end="url(#arrow)" stroke-dasharray="3 5"/>
+          <path id="edge-6" data-label="GetItem" d="M770,500 C790,540 790,560 790,570" marker-end="url(#arrow)"/>
+          <path id="edge-7" data-label="PutObject" d="M660,500 C620,540 600,560 580,570" marker-end="url(#arrow)"/>
+          <path id="edge-8a" data-label="Publish" d="M840,460 L960,460" marker-end="url(#arrow)"/>
+          <path id="edge-8b" data-label="notify" d="M1060,460 L1140,460" marker-end="url(#arrow)"/>
+        </g>
+
+        <!-- edge labels: positioned at runtime from each path's own midpoint, so they always sit on the line -->
+        <g id="edge-labels" font-family="IBM Plex Mono, monospace" font-size="11" fill="#8a96a8" text-anchor="middle"></g>
+
+        <!-- nodes -->
+        <g id="nodes" font-family="IBM Plex Sans, sans-serif">
+          <!-- incident -->
+          <g class="node" id="n-incident" transform="translate(40,430)">
+            <rect width="100" height="60" rx="8" fill="#0d131c" stroke="#3a4558" stroke-width="1.5"/>
+            <text x="50" y="26" text-anchor="middle" font-size="11" fill="#8a96a8" font-family="IBM Plex Mono">source</text>
+            <text x="50" y="44" text-anchor="middle" font-size="13" fill="#e8edf4" font-weight="500">Network</text>
+            <text x="50" y="58" text-anchor="middle" font-size="13" fill="#e8edf4" font-weight="500">alarm</text>
+          </g>
+
+          <!-- EventBridge -->
+          <g class="node" id="n-eventbridge" transform="translate(260,430)">
+            <rect width="100" height="60" rx="8" fill="#0d131c" stroke="#3a4558" stroke-width="1.5"/>
+            <text x="50" y="26" text-anchor="middle" font-size="11" fill="#8a96a8" font-family="IBM Plex Mono">AWS</text>
+            <text x="50" y="44" text-anchor="middle" font-size="13" fill="#e8edf4" font-weight="500">Event</text>
+            <text x="50" y="58" text-anchor="middle" font-size="13" fill="#e8edf4" font-weight="500">Bridge</text>
+          </g>
+
+          <!-- Lambda -->
+          <g class="node" id="n-lambda" transform="translate(460,430)">
+            <rect width="100" height="60" rx="8" fill="#0d131c" stroke="#3a4558" stroke-width="1.5"/>
+            <text x="50" y="26" text-anchor="middle" font-size="11" fill="#8a96a8" font-family="IBM Plex Mono">AWS</text>
+            <text x="50" y="44" text-anchor="middle" font-size="13" fill="#e8edf4" font-weight="500">Lambda</text>
+            <text x="50" y="58" text-anchor="middle" font-size="13" fill="#e8edf4" font-weight="500">shim</text>
+          </g>
+
+          <!-- AgentCore hub -->
+          <g class="node" id="n-agentcore" transform="translate(660,410)">
+            <rect width="150" height="100" rx="10" fill="#0d131c" stroke="#56e0c6" stroke-width="2"/>
+            <text x="75" y="30" text-anchor="middle" font-size="11" fill="#56e0c6" font-family="IBM Plex Mono">Bedrock</text>
+            <text x="75" y="52" text-anchor="middle" font-size="15" fill="#e8edf4" font-weight="600">AgentCore</text>
+            <text x="75" y="72" text-anchor="middle" font-size="13" fill="#e8edf4" font-weight="500">Runtime</text>
+            <text x="75" y="90" text-anchor="middle" font-size="10" fill="#8a96a8">SKILL.md + 7 tools</text>
+          </g>
+
+          <!-- Bedrock model -->
+          <g class="node" id="n-bedrock" transform="translate(850,220)">
+            <rect width="110" height="60" rx="8" fill="#0d131c" stroke="#3a4558" stroke-width="1.5"/>
+            <text x="55" y="26" text-anchor="middle" font-size="11" fill="#8a96a8" font-family="IBM Plex Mono">Bedrock</text>
+            <text x="55" y="44" text-anchor="middle" font-size="13" fill="#e8edf4" font-weight="500">Claude</text>
+            <text x="55" y="58" text-anchor="middle" font-size="13" fill="#e8edf4" font-weight="500">Sonnet</text>
+          </g>
+
+          <!-- S3 knowledge -->
+          <g class="node" id="n-s3" transform="translate(700,170)">
+            <rect width="110" height="60" rx="8" fill="#0d131c" stroke="#3a4558" stroke-width="1.5"/>
+            <text x="55" y="26" text-anchor="middle" font-size="11" fill="#8a96a8" font-family="IBM Plex Mono">AWS</text>
+            <text x="55" y="44" text-anchor="middle" font-size="13" fill="#e8edf4" font-weight="500">S3</text>
+            <text x="55" y="58" text-anchor="middle" font-size="10" fill="#8a96a8">SOPs + refs</text>
+          </g>
+
+          <!-- DynamoDB -->
+          <g class="node" id="n-dynamodb" transform="translate(735,570)">
+            <rect width="110" height="60" rx="8" fill="#0d131c" stroke="#3a4558" stroke-width="1.5"/>
+            <text x="55" y="26" text-anchor="middle" font-size="11" fill="#8a96a8" font-family="IBM Plex Mono">AWS</text>
+            <text x="55" y="44" text-anchor="middle" font-size="13" fill="#e8edf4" font-weight="500">DynamoDB</text>
+            <text x="55" y="58" text-anchor="middle" font-size="10" fill="#8a96a8">evidence</text>
+          </g>
+
+          <!-- S3 reports -->
+          <g class="node" id="n-s3reports" transform="translate(525,570)">
+            <rect width="110" height="60" rx="8" fill="#0d131c" stroke="#3a4558" stroke-width="1.5"/>
+            <text x="55" y="26" text-anchor="middle" font-size="11" fill="#8a96a8" font-family="IBM Plex Mono">AWS</text>
+            <text x="55" y="44" text-anchor="middle" font-size="13" fill="#e8edf4" font-weight="500">S3</text>
+            <text x="55" y="58" text-anchor="middle" font-size="10" fill="#8a96a8">reports</text>
+          </g>
+
+          <!-- SNS -->
+          <g class="node" id="n-sns" transform="translate(960,430)">
+            <rect width="100" height="60" rx="8" fill="#0d131c" stroke="#3a4558" stroke-width="1.5"/>
+            <text x="50" y="26" text-anchor="middle" font-size="11" fill="#8a96a8" font-family="IBM Plex Mono">AWS</text>
+            <text x="50" y="44" text-anchor="middle" font-size="13" fill="#e8edf4" font-weight="500">SNS</text>
+            <text x="50" y="58" text-anchor="middle" font-size="10" fill="#8a96a8">topic</text>
+          </g>
+
+          <!-- Engineer -->
+          <g class="node" id="n-engineer" transform="translate(1140,430)">
+            <rect width="20" height="20" display="none"/>
+            <circle cx="20" cy="18" r="16" fill="#0d131c" stroke="#3a4558" stroke-width="1.5"/>
+            <text x="20" y="22" text-anchor="middle" font-size="16" fill="#e8edf4">&#9995;</text>
+            <text x="20" y="54" text-anchor="middle" font-size="11" fill="#8a96a8">On-call</text>
+            <text x="20" y="66" text-anchor="middle" font-size="11" fill="#8a96a8">engineer</text>
+          </g>
+        </g>
+
+        <!-- moving packet -->
+        <circle id="packet" r="7" fill="#ffb454" opacity="0"/>
+      </svg>
+    </div>
+
+    <div class="cap-bar">
+      <p class="cap-text idle" id="caption"><span class="step-no" id="stepNo"></span><span id="captionText">Press play to start the walkthrough.</span></p>
+    </div>
+
+    <div class="cap-bar" style="border-top:none">
+      <div class="controls">
+        <button class="primary" id="playBtn">&#9654; Play</button>
+        <button id="replayBtn">&#8634; Replay</button>
+      </div>
+      <label class="muted-toggle"><input type="checkbox" id="muteToggle"> Mute narration</label>
+    </div>
+    <div class="cap-bar" style="border-top:none;padding-top:0">
+      <div class="progress" id="progress"></div>
+    </div>
+  </div>
+
+  <details id="scriptDetails">
+    <summary>Narration script (read or copy)</summary>
+    <div class="script" id="scriptList"></div>
+    <div class="copy-row"><button id="copyBtn">Copy full script</button></div>
+  </details>
+
+  <footer>Built on Amazon EventBridge, Lambda, Bedrock AgentCore, Bedrock, S3, DynamoDB and SNS — the AWS &ldquo;Building AI Agents for Telecom Network Operations&rdquo; pattern.</footer>
+</div>
+
+<script>
+(function(){
+  "use strict";
+
+  var steps = [
+    { edges: ["edge-1"], nodes: ["n-incident","n-eventbridge"],
+      text: "A network alarm fires and lands on Amazon EventBridge." },
+    { edges: ["edge-2"], nodes: ["n-eventbridge","n-lambda"],
+      text: "EventBridge matches the rule and triggers a small Lambda shim." },
+    { edges: ["edge-3"], nodes: ["n-lambda","n-agentcore"],
+      text: "The shim invokes the agent running on Bedrock AgentCore Runtime." },
+    { edges: ["edge-4a","edge-4b"], nodes: ["n-agentcore","n-s3"],
+      text: "AgentCore reads SKILL.md and the SOP reference files straight from S3 — no vector database, no retraining." },
+    { edges: ["edge-5a","edge-5b"], nodes: ["n-agentcore","n-bedrock"],
+      text: "The agent reasons step by step using an Amazon Bedrock foundation model, citing each SOP step it follows." },
+    { edges: ["edge-6"], nodes: ["n-agentcore","n-dynamodb"],
+      text: "It checks the incident evidence already recorded in DynamoDB." },
+    { edges: ["edge-7"], nodes: ["n-agentcore","n-s3reports"],
+      text: "And writes a structured, cited root-cause report back to S3." },
+    { edges: ["edge-8a","edge-8b"], nodes: ["n-agentcore","n-sns","n-engineer"],
+      text: "Finally, it publishes a notification through SNS straight to the on-call engineer." }
+  ];
+  var outro = "Built entirely on AWS — EventBridge, Lambda, Bedrock AgentCore, Bedrock, S3, DynamoDB and SNS — following AWS's own reference pattern for telecom AI agents.";
+
+  var svg = document.getElementById("diagram");
+  var packet = document.getElementById("packet");
+  var captionText = document.getElementById("captionText");
+  var captionEl = document.getElementById("caption");
+  var stepNoEl = document.getElementById("stepNo");
+  var progressEl = document.getElementById("progress");
+  var playBtn = document.getElementById("playBtn");
+  var replayBtn = document.getElementById("replayBtn");
+  var muteToggle = document.getElementById("muteToggle");
+  var chosenVoice = null;
+
+  // Locked to Google UK English, per preference — no picker, no other voices tried.
+  function pickVoice(){
+    if (!("speechSynthesis" in window)) return;
+    var voices = window.speechSynthesis.getVoices();
+    chosenVoice = voices.find(function(v){ return /google uk english.*male/i.test(v.name); })
+      || voices.find(function(v){ return /google.*uk.*male/i.test(v.name); })
+      || null;
+  }
+  if ("speechSynthesis" in window) {
+    pickVoice();
+    window.speechSynthesis.onvoiceschanged = pickVoice;
+  }
+
+  var current = -1;
+  var playing = false;
+  var reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+  // Place each edge label at its own path's true midpoint, with a background pill so it
+  // stays legible wherever the curve happens to pass (never guessed by eye).
+  var labelsGroup = document.getElementById("edge-labels");
+  document.querySelectorAll("#edges path[data-label]").forEach(function(path){
+    var len = path.getTotalLength();
+    var mid = path.getPointAtLength(len / 2);
+    var lines = path.getAttribute("data-label").split("|");
+
+    var text = document.createElementNS("http://www.w3.org/2000/svg", "text");
+    text.setAttribute("x", mid.x);
+    var lineHeight = 12;
+    var firstY = mid.y - ((lines.length - 1) * lineHeight) / 2;
+    lines.forEach(function(line, i){
+      var tspan = document.createElementNS("http://www.w3.org/2000/svg", "tspan");
+      tspan.setAttribute("x", mid.x);
+      tspan.setAttribute("y", firstY + i * lineHeight);
+      tspan.textContent = line;
+      text.appendChild(tspan);
+    });
+    labelsGroup.appendChild(text);
+
+    var bbox = text.getBBox();
+    var pad = 4;
+    var rect = document.createElementNS("http://www.w3.org/2000/svg", "rect");
+    rect.setAttribute("x", bbox.x - pad);
+    rect.setAttribute("y", bbox.y - pad / 2);
+    rect.setAttribute("width", bbox.width + pad * 2);
+    rect.setAttribute("height", bbox.height + pad);
+    rect.setAttribute("rx", 3);
+    rect.setAttribute("fill", "#111823");
+    rect.setAttribute("fill-opacity", "0.92");
+    labelsGroup.insertBefore(rect, text);
+  });
+
+  // build progress dots
+  steps.forEach(function(){
+    var i = document.createElement("i");
+    progressEl.appendChild(i);
+  });
+
+  // build script list
+  var scriptList = document.getElementById("scriptList");
+  steps.forEach(function(s, idx){
+    var p = document.createElement("p");
+    p.innerHTML = '<span class="n">' + String(idx+1).padStart(2,"0") + '</span>' + s.text;
+    scriptList.appendChild(p);
+  });
+  var pOutro = document.createElement("p");
+  pOutro.innerHTML = '<span class="n">END</span>' + outro;
+  scriptList.appendChild(pOutro);
+
+  document.getElementById("copyBtn").addEventListener("click", function(){
+    var full = steps.map(function(s,i){ return (i+1)+". "+s.text; }).join("\n\n") + "\n\nEND. " + outro;
+    var btn = this;
+    function done(ok){ btn.textContent = ok ? "Copied" : "Select the text above to copy"; setTimeout(function(){ btn.textContent = "Copy full script"; }, 1600); }
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(full).then(function(){ done(true); }, function(){ done(false); });
+    } else { done(false); }
+  });
+
+  function nodeCenter(id){
+    var g = document.getElementById(id);
+    var rect = g.querySelector("rect");
+    var circle = g.querySelector("circle");
+    var t = g.getAttribute("transform") || "";
+    var m = /translate\(([-\d.]+),([-\d.]+)\)/.exec(t);
+    var ox = m ? parseFloat(m[1]) : 0, oy = m ? parseFloat(m[2]) : 0;
+    if (rect) {
+      var w = parseFloat(rect.getAttribute("width"))||0, h = parseFloat(rect.getAttribute("height"))||0;
+      return { x: ox + w/2, y: oy + h/2 };
+    }
+    if (circle) {
+      return { x: ox + parseFloat(circle.getAttribute("cx")), y: oy + parseFloat(circle.getAttribute("cy")) };
+    }
+    return { x: ox, y: oy };
+  }
+
+  function clearHighlights(){
+    svg.querySelectorAll(".node rect, .node circle").forEach(function(el){
+      el.setAttribute("stroke", el.closest("#n-agentcore") ? "#56e0c6" : "#3a4558");
+      el.setAttribute("stroke-width", el.closest("#n-agentcore") ? "2" : "1.5");
+    });
+    svg.querySelectorAll("#edges path").forEach(function(el){
+      el.setAttribute("stroke", "#3a4558");
+      el.setAttribute("stroke-width", "2");
+    });
+  }
+
+  function highlightNodes(ids){
+    ids.forEach(function(id){
+      var g = document.getElementById(id);
+      var shape = g.querySelector("rect, circle");
+      shape.setAttribute("stroke", "#ffb454");
+      shape.setAttribute("stroke-width", "2.5");
+    });
+  }
+
+  function animateEdge(edgeId, duration){
+    return new Promise(function(resolve){
+      var path = document.getElementById(edgeId);
+      path.setAttribute("stroke", "#ffb454");
+      path.setAttribute("stroke-width", "2.5");
+      var len = path.getTotalLength();
+      if (reduced) { packet.style.opacity = 0; resolve(); return; }
+      packet.style.opacity = 1;
+      var start = null;
+      function frame(ts){
+        if (!start) start = ts;
+        var p = Math.min(1, (ts - start) / duration);
+        var pt = path.getPointAtLength(p * len);
+        packet.setAttribute("cx", pt.x);
+        packet.setAttribute("cy", pt.y);
+        if (p < 1) { requestAnimationFrame(frame); }
+        else { packet.style.opacity = 0; resolve(); }
+      }
+      requestAnimationFrame(frame);
+    });
+  }
+
+  function speak(text){
+    return new Promise(function(resolve){
+      if (muteToggle.checked || !("speechSynthesis" in window)) {
+        setTimeout(resolve, Math.max(1400, text.length * 38));
+        return;
+      }
+      try {
+        window.speechSynthesis.cancel();
+        var u = new SpeechSynthesisUtterance(text);
+        u.rate = 0.95;
+        u.pitch = 1.0;
+        if (chosenVoice) u.voice = chosenVoice;
+        u.onend = resolve;
+        u.onerror = resolve;
+        window.speechSynthesis.speak(u);
+        setTimeout(resolve, Math.max(4000, text.length * 85));
+      } catch (e) { setTimeout(resolve, 1800); }
+    });
+  }
+
+  function updateProgress(idx){
+    Array.prototype.forEach.call(progressEl.children, function(dot, i){
+      dot.className = i < idx ? "done" : (i === idx ? "now" : "");
+    });
+  }
+
+  async function runStep(idx){
+    if (idx < 0 || idx >= steps.length) return;
+    current = idx;
+    var s = steps[idx];
+    clearHighlights();
+    highlightNodes(s.nodes);
+    stepNoEl.textContent = "STEP " + (idx+1) + "/" + steps.length;
+    captionText.textContent = s.text;
+    captionEl.classList.remove("idle");
+    updateProgress(idx);
+    var speakP = speak(s.text);
+    for (var i = 0; i < s.edges.length; i++) {
+      await animateEdge(s.edges[i], 1100);
+    }
+    await speakP;
+  }
+
+  async function playAll(){
+    if (playing) return;
+    playing = true;
+    playBtn.textContent = "❚❚ Playing…";
+    playBtn.disabled = true;
+    for (var i = current + 1; i < steps.length; i++) {
+      if (!playing) break;
+      await runStep(i);
+    }
+    clearHighlights();
+    stepNoEl.textContent = "DONE";
+    captionText.textContent = outro;
+    await speak(outro);
+    playing = false;
+    playBtn.disabled = false;
+    playBtn.textContent = "↺ Play again";
+  }
+
+  playBtn.addEventListener("click", function(){
+    if (playing) return;
+    if (current >= steps.length - 1) { current = -1; clearHighlights(); updateProgress(-1); }
+    playAll();
+  });
+  replayBtn.addEventListener("click", function(){
+    playing = false;
+    window.speechSynthesis && window.speechSynthesis.cancel();
+    current = -1;
+    clearHighlights();
+    updateProgress(-1);
+    stepNoEl.textContent = "";
+    captionText.textContent = "Press play to start the walkthrough.";
+    captionEl.classList.add("idle");
+    playBtn.textContent = "▶ Play";
+    playBtn.disabled = false;
+  });
+})();
+</script>

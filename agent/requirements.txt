@@ -1,0 +1,6 @@
+bedrock-agentcore==1.24.0
+strands-agents==1.57.2
+pydantic>=2.0,<3
+boto3
+uvicorn
+aws-opentelemetry-distro>=0.18.0

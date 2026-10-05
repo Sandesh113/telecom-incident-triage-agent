@@ -1,0 +1,127 @@
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "WhoAmIAndTags",
+      "Effect": "Allow",
+      "Action": ["sts:GetCallerIdentity", "tag:GetResources", "iam:GetAccountSummary"],
+      "Resource": "*"
+    },
+    {
+      "Sid": "BudgetsAndCostAnomaly",
+      "Effect": "Allow",
+      "Action": ["budgets:*", "ce:*AnomalyMonitor*", "ce:*AnomalySubscription*", "ce:TagResource", "ce:UntagResource", "ce:ListTagsForResource"],
+      "Resource": "*"
+    },
+    {
+      "Sid": "S3SopRcaBuckets",
+      "Effect": "Allow",
+      "Action": "s3:*",
+      "Resource": ["arn:aws:s3:::sop-rca-*", "arn:aws:s3:::sop-rca-*/*"]
+    },
+    {
+      "Sid": "S3ListAll",
+      "Effect": "Allow",
+      "Action": ["s3:ListAllMyBuckets"],
+      "Resource": "*"
+    },
+    {
+      "Sid": "DynamoDbEvidenceTable",
+      "Effect": "Allow",
+      "Action": "dynamodb:*",
+      "Resource": ["arn:aws:dynamodb:eu-north-1:270293010572:table/sop-rca-*", "arn:aws:dynamodb:eu-north-1:270293010572:table/sop-rca-*/*"]
+    },
+    {
+      "Sid": "SnsTriageTopic",
+      "Effect": "Allow",
+      "Action": "sns:*",
+      "Resource": "arn:aws:sns:eu-north-1:270293010572:sop-rca-*"
+    },
+    {
+      "Sid": "EventBridgeSopRca",
+      "Effect": "Allow",
+      "Action": "events:*",
+      "Resource": [
+        "arn:aws:events:eu-north-1:270293010572:event-bus/sop-rca-*",
+        "arn:aws:events:eu-north-1:270293010572:rule/sop-rca-*",
+        "arn:aws:events:eu-north-1:270293010572:rule/sop-rca-*/*"
+      ]
+    },
+    {
+      "Sid": "EventBridgeDescribeAndTestEvents",
+      "Effect": "Allow",
+      "Action": ["events:DescribeEventBus", "events:ListEventBuses", "events:ListRules", "events:PutEvents"],
+      "Resource": "*"
+    },
+    {
+      "Sid": "LambdaShim",
+      "Effect": "Allow",
+      "Action": "lambda:*",
+      "Resource": "arn:aws:lambda:eu-north-1:270293010572:function:sop-rca-*"
+    },
+    {
+      "Sid": "Logs",
+      "Effect": "Allow",
+      "Action": "logs:*",
+      "Resource": [
+        "arn:aws:logs:eu-north-1:270293010572:log-group:/aws/lambda/sop-rca-*",
+        "arn:aws:logs:eu-north-1:270293010572:log-group:/aws/lambda/sop-rca-*:*",
+        "arn:aws:logs:eu-north-1:270293010572:log-group:/aws/bedrock-agentcore/runtimes/*",
+        "arn:aws:logs:eu-north-1:270293010572:log-group:/aws/bedrock-agentcore/runtimes/*:*"
+      ]
+    },
+    {
+      "Sid": "LogsDescribe",
+      "Effect": "Allow",
+      "Action": ["logs:DescribeLogGroups"],
+      "Resource": "*"
+    },
+    {
+      "Sid": "EcrFallbackRepo",
+      "Effect": "Allow",
+      "Action": "ecr:*",
+      "Resource": "arn:aws:ecr:eu-north-1:270293010572:repository/sop-rca-*"
+    },
+    {
+      "Sid": "EcrToken",
+      "Effect": "Allow",
+      "Action": "ecr:GetAuthorizationToken",
+      "Resource": "*"
+    },
+    {
+      "Sid": "AgentCoreRuntime",
+      "Effect": "Allow",
+      "Action": "bedrock-agentcore:*",
+      "Resource": "arn:aws:bedrock-agentcore:eu-north-1:270293010572:*"
+    },
+    {
+      "Sid": "AgentCoreList",
+      "Effect": "Allow",
+      "Action": ["bedrock-agentcore:List*", "bedrock-agentcore:Get*"],
+      "Resource": "*"
+    },
+    {
+      "Sid": "BedrockPreflightAndSmokeTest",
+      "Effect": "Allow",
+      "Action": ["bedrock:InvokeModel", "bedrock:InvokeModelWithResponseStream", "bedrock:ListFoundationModels", "bedrock:ListInferenceProfiles", "bedrock:GetInferenceProfile", "bedrock:GetFoundationModel", "bedrock:GetFoundationModelAvailability"],
+      "Resource": "*"
+    },
+    {
+      "Sid": "IamForSopRcaRolesOnly",
+      "Effect": "Allow",
+      "Action": [
+        "iam:CreateRole", "iam:DeleteRole", "iam:GetRole", "iam:UpdateAssumeRolePolicy", "iam:TagRole", "iam:UntagRole",
+        "iam:PutRolePolicy", "iam:GetRolePolicy", "iam:DeleteRolePolicy",
+        "iam:ListRolePolicies", "iam:ListAttachedRolePolicies", "iam:ListInstanceProfilesForRole",
+        "iam:PassRole"
+      ],
+      "Resource": "arn:aws:iam::270293010572:role/sop-rca-*"
+    },
+    {
+      "Sid": "ServiceLinkedRolesIfNeeded",
+      "Effect": "Allow",
+      "Action": ["iam:CreateServiceLinkedRole"],
+      "Resource": "arn:aws:iam::270293010572:role/aws-service-role/*"
+    }
+  ]
+}

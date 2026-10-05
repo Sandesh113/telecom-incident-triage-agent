@@ -1,0 +1,9 @@
+# Keep LF in the repo AND in the working tree on every OS.
+# Bash scripts with CRLF endings fail in Git Bash and on the Linux AgentCore runtime.
+* text=auto eol=lf
+
+# Never touch binaries.
+*.zip binary
+*.docx binary
+*.pdf binary
+*.png binary

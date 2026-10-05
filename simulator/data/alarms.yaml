@@ -1,0 +1,357 @@
+# Alarm dictionary for the synthetic "Albion Mobile" demo network.
+# Consumed by the enrichment step, not by the agent (SKILL.md step 2).
+# A routing trigger selects a candidate SOP; it never establishes a cause ([RULES.1]).
+# Thresholds marked demo_setting are demo values, not production limits.
+
+dictionary_version: "0.2"
+status: draft
+applies_to: {sop: "0.4", skill: "0.4", reference: "0.3"}
+
+# ===========================================================================
+# 1. Normalized event schema (one record per notification)
+# ===========================================================================
+normalized_event:
+  event_id:        "Unique ID of this notification (raise and clear have different event_ids)"
+  alarm_id:        "Lifecycle ID shared by the raise and its clear; null for non-alarm sources"
+  alarm_state:     "active | cleared   (null for non-alarm sources)"
+  severity:        "critical | major | minor | warning   (independent of alarm_state)"
+  event_type:      "Normalized type, always kept (e.g. PFCP_PATH_FAILURE, LINK_DOWN)"
+  routing_trigger: "SOP trigger name, or null when the event is context only"
+  routing_role:    "route | context"
+  reporting_object_id:   "Canonical ID of the element that reported the event"
+  reporting_object_type: "one value from object_type_enum"
+  target_object_id:      "Canonical ID of the element the event is about (may equal reporting object)"
+  target_object_type:    "one value from object_type_enum"
+  interface:       "N7 | N4 | N8 | N10 | N13 | N35 | S6a | Cx | Gx | Rx | N2 | N3 | GTP-C | null"
+  possible_causes: "list of mapping hints"
+  cause_status:    "unverified_mapping_hint   (always; never a diagnosis)"
+  event_time:      "UTC ISO-8601, from the source as defined per source below"
+  ingest_time:     "UTC ISO-8601, set at ingest"
+  late_event:      "true when ingest_time - event_time > 5 minutes ([RULES.4])"
+  source_system:   "vendor_a | vendor_b | change_mgmt | cne | care | kpi_derived"
+  flags:           "list, e.g. subscriber_function_unknown, routing_mismatch, transition_observability_incomplete"
+  raw:             "original record, unchanged, for provenance"
+
+object_type_enum: [smf, pcf, pcrf, upf, amf, mme, ausf, udm, udr, hss, cscf, nrf, scp,
+                   port, bfd_session, lag_member, aggregate_link, cell, service, unknown_subscriber_data]
+# Every normalized event carries exactly one value for each *_object_type field.
+
+# ===========================================================================
+# 2. Vendor source formats and identity rules
+# ===========================================================================
+sources:
+  vendor_a:
+    fields: {notification_id: notificationId, alarm_id: alarmId, raw_name: specificProblem,
+             reporting_object: managedObject, target_object: affectedObject,
+             severity: perceivedSeverity, event_time: eventTime, state: notificationType}
+    severity_map: {critical: critical, major: major, minor: minor, warning: warning}
+    state_map: {raised: active, cleared: cleared}
+    time_format: "ISO-8601 with offset; convert to UTC"
+    event_id: "A:{notification_id}"
+    alarm_id: "A:{alarm_id}"
+  vendor_b:
+    fields: {notification_id: evt, alarm_id: aid, raw_name: code, raw_text: text,
+             reporting_object: node, target_object: peer,
+             severity: sev, event_time: ts, state: state}
+    severity_map: {5: critical, 4: major, 3: minor, 2: warning, 1: warning}
+    state_map: {ACTIVE: active, CLEARED: cleared}
+    time_format: "epoch milliseconds, UTC"
+    event_id: "B:{notification_id}"
+    alarm_id: "B:{alarm_id}"
+  fallback_event_id: >
+    If a source record lacks a unique notification ID, build
+    event_id = "{source}:{alarm_id}:{alarm_state}:{event_time}".
+  deduplication_key: event_id      # never alarm_id, so a clear is never discarded as a duplicate
+
+# ===========================================================================
+# 3. Alarm mappings (vendor raw name -> normalized event)
+#    object types are concrete per raw name; inventory rules only where stated.
+# ===========================================================================
+mappings:
+  # ---- Policy (SOP-01) ----
+  - event_type: N7_TIMEOUT
+    routing_trigger: N7_TIMEOUT
+    routing_role: route
+    candidate_sop: SOP-01
+    raw_names: {vendor_a: ["SMF N7 Npcf request timeout"], vendor_b: ["SMF-N7-TMO"]}
+    reporting_object_type: smf
+    target_object_type: pcf
+    interface: N7
+    possible_causes: ["PCF not responding", "SMF-to-PCF path fault", "discovery or SCP fault"]
+    knowledge: [REF-CORE.2, REF-CORE.4]
+  - event_type: PCF_POLICY_REQUEST_FAILURE
+    routing_trigger: PCF_POLICY_REQUEST_FAILURE
+    routing_role: route
+    candidate_sop: SOP-01
+    raw_names: {vendor_a: ["SMF N7 Npcf error response"], vendor_b: ["SMF-N7-ERR"]}
+    reporting_object_type: smf
+    target_object_type: pcf
+    interface: N7
+    possible_causes: ["PCF rejecting or failing policy decisions"]
+    knowledge: [REF-CORE.2, REF-CORE.4]
+  - event_type: PCF_UNREACHABLE
+    routing_trigger: PCF_UNREACHABLE
+    routing_role: route
+    candidate_sop: SOP-01
+    raw_names: {vendor_a: ["NF heartbeat lost: PCF"], vendor_b: ["NF-HB-LOST-PCF"]}
+    reporting_object_type_rule: "from inventory record of reporting_object (smf | nrf | scp)"
+    target_object_type: pcf
+    interface: null
+    possible_causes: ["PCF down", "discovery or SCP fault", "path fault"]
+    knowledge: [REF-CORE.4, REF-CORE.6]
+
+  # ---- Subscriber data (SOP-02). HSS and UDM are never interchangeable. ----
+  - event_type: HSS_UNREACHABLE
+    routing_trigger: HSS_UNREACHABLE
+    routing_role: route
+    candidate_sop: SOP-02
+    raw_names: {vendor_a: ["S6a Diameter peer down: HSS"], vendor_b: ["DIA-PEER-DOWN-HSS"]}
+    reporting_object_type: mme
+    target_object_type: hss
+    interface: S6a
+    possible_causes: ["HSS down", "MME-to-HSS path fault"]
+    knowledge: [REF-CORE.5]
+  - event_type: UDM_UNREACHABLE
+    routing_trigger: UDM_UNREACHABLE
+    routing_role: route
+    candidate_sop: SOP-02
+    raw_names: {vendor_a: ["NF heartbeat lost: UDM"], vendor_b: ["NF-HB-LOST-UDM"]}
+    reporting_object_type_rule: "from inventory record of reporting_object (amf | smf | ausf)"
+    target_object_type: udm
+    interface_rule: "amf -> N8, smf -> N10, ausf -> N13"
+    possible_causes: ["UDM down", "UDR (N35) dependency", "path fault"]
+    knowledge: [REF-CORE.5, REF-CORE.6]
+  - event_type: SUBSCRIBER_DATA_TIMEOUT
+    routing_trigger: SUBSCRIBER_DATA_TIMEOUT
+    routing_role: route
+    candidate_sop: SOP-02
+    raw_names: {vendor_a: ["Subscriber data request timeout"], vendor_b: ["SDM-REQ-TMO"]}
+    reporting_object_type_rule: "from inventory record of reporting_object"
+    target_object_type_rule: >
+      From the inventory record of target_object: hss or udm.
+      If inventory cannot identify it, target_object_type = unknown_subscriber_data
+      and add flag subscriber_function_unknown. Never guess (SOP-02).
+    possible_causes: ["Subscriber-data function slow, overloaded or unreachable"]
+    knowledge: [REF-CORE.5]
+
+  # ---- Transport (SOP-03). Transitions are counted from LINK_DOWN / LINK_UP only. ----
+  - event_type: LINK_DOWN
+    routing_trigger: LINK_DOWN
+    routing_role: route
+    candidate_sop: SOP-03
+    raw_names_by_object_type:
+      port:           {vendor_a: ["Ethernet port down"], vendor_b: ["IF-DOWN"]}
+      bfd_session:    {vendor_a: ["BFD session down"],   vendor_b: ["BFD-DOWN"]}
+      lag_member:     {vendor_a: ["LAG member down"],    vendor_b: ["LAGM-DOWN"]}
+      aggregate_link: {vendor_a: ["LAG down"],           vendor_b: ["LAG-DOWN"]}
+    resulting_state: down
+    note: "A BFD down means the monitored forwarding path failed, not necessarily a fibre fault (REF-TX.2)."
+    possible_causes: ["loss of signal", "forwarding-path failure", "member failure"]
+    knowledge: [REF-TX.2]
+  - event_type: LINK_UP
+    routing_trigger: LINK_UP
+    routing_role: route
+    candidate_sop: SOP-03
+    produced_by:
+      - "the clear (alarm_state = cleared) of a LINK_DOWN alarm"
+      - {vendor_b_explicit: ["IF-UP", "BFD-UP", "LAGM-UP", "LAG-UP"]}
+    resulting_state: up
+    dedup_rule:
+      purpose: "A clear and an explicit UP describing the same change become one state transition."
+      match_on: [target_object_id, target_object_type, resulting_state]
+      prefer: "same alarm_id when both records carry it"
+      time_tolerance_seconds: 2            # demo_setting
+      keep: "both normalized events; mark the later one transition_duplicate_of: <event_id>"
+    knowledge: [REF-TX.2]
+  - event_type: TRANSPORT_LINK_FLAP
+    routing_trigger: TRANSPORT_LINK_FLAP
+    routing_role: route
+    candidate_sop: SOP-03
+    raw_names: {vendor_a: ["Interface flapping detected"], vendor_b: ["IF-FLAP"]}
+    target_object_type_rule: "port or aggregate_link, from inventory"
+    counting_rule: >
+      Not a transition. If individual LINK_DOWN/LINK_UP events for the object are
+      missing in the window (e.g. device damping), add flag
+      transition_observability_incomplete; SOP-03.1 then reports the threshold as
+      unable_to_check, not as below threshold.
+    knowledge: [REF-TX.2]
+
+  # ---- Context alarms: identity kept, no routing ----
+  - event_type: PFCP_PATH_FAILURE
+    routing_trigger: null
+    routing_role: context
+    raw_names: {vendor_a: ["PFCP path failure on N4 interface"], vendor_b: ["N4-PFCP-PATH-FAIL"]}
+    reporting_object_type_rule: "smf or upf, from inventory"
+    target_object_type_rule: "the peer (upf or smf)"
+    interface: N4
+    note: "Not assumed to cause concurrent GTP-C failures (REF-CORE.7)."
+    knowledge: [REF-CORE.7, REF-CORR.1]
+  - event_type: GTPC_PATH_FAILURE
+    routing_trigger: null
+    routing_role: context
+    raw_names: {vendor_a: ["GTP-C path failure"], vendor_b: ["GTPC-PATH-FAIL"]}
+    reporting_object_type: smf
+    target_object_type_rule: "peer from inventory"
+    interface: GTP-C
+    note: "Needs its own endpoint, interface and topology checks (REF-CORE.7)."
+    knowledge: [REF-CORE.7]
+  - event_type: HOUSEKEEPING_CONTEXT
+    routing_trigger: null
+    routing_role: context
+    context_priority: low
+    raw_names: {vendor_a: ["Fan speed degraded", "Temperature threshold crossed", "Log partition 80% full"],
+                vendor_b: ["ENV-FAN", "ENV-TEMP", "SYS-DISK-WARN"]}
+    note: "Low priority by default; evidence can still make it relevant (REF-CORR.5)."
+
+unmapped_policy:
+  event_type: UNMAPPED
+  routing_trigger: null
+  routing_role: context
+  rule: "Keep, list in enrichment output unmapped_alarms; never drop."
+
+# ===========================================================================
+# 4. Non-alarm sources: identity and time transformations
+# ===========================================================================
+change_events:
+  source_system: change_mgmt
+  event_id: "CHG:{change_id}:{status}"
+  event_time: "executed_time when status = executed; otherwise status_time"
+  routing_role: context            # a change never selects SOP-04 on its own
+  types:
+    RF_FREQUENCY_CHANGE:     {raw_types: ["RF_CARRIER_CHANGE", "ARFCN_CHANGE"]}
+    NEIGHBOUR_CONFIG_CHANGE: {raw_types: ["NEIGHBOUR_RELATION_CHANGE", "MEAS_CONFIG_CHANGE", "PCI_CHANGE"]}
+  required_fields: [change_id, cell_id, parameter, old_value, new_value, executed_time, status]
+  target_object_type: cell
+
+cne_events:
+  source_system: cne
+  event_type: CNE_INCIDENT
+  routing_trigger: CNE_INCIDENT
+  routing_role: route
+  candidate_sop: SOP-05
+  event_id: "CNE:{source_event_id}"
+  event_time: "source event_time (UTC)"
+  target_object_type: cell
+  required_fields: [source_event_id, cell_id, service_id, customer_id, enterprise_flag,
+                    raw_cause, reporting_element, event_time]
+
+care_events:
+  source_system: care
+  event_type: CUSTOMER_COMPLAINT
+  routing_trigger: CUSTOMER_COMPLAINT
+  routing_role: route
+  candidate_sop: SOP-05
+  event_id: "CARE:{complaint_id}"
+  event_time: "reported_time (when the customer reported, not when the fault began)"
+  target_object_type: service
+  required_fields: [complaint_id, customer_id, enterprise_flag, service_id, reported_time, cell_id_if_known]
+  note: "A complaint count alone is never a root-cause claim (SOP-05)."
+
+kpi_derived:
+  source_system: kpi_derived
+  comparison: "current 15-minute event-time window vs the preceding 15-minute window ([RULES.2])"
+  investigation_trigger_pp: 3          # demo_setting; escalation stays at the SOP's 5 pp
+  minimum_attempts_each_window: 20     # [RULES.6]; below this, no trigger, record insufficient_sample
+  fixture_note: "Use >= 50 attempts per window where early detection is demonstrated (at 20 attempts one failure = 5 pp)."
+  episode_rule: >
+    Emit one event per breach episode. An episode ends after one full window
+    below the investigation threshold; a new breach then starts a new episode.
+  event_id: "KPI:{kpi}:{object_id}:{episode_start_window_start}"
+  event_time: "window_end of the first breaching window (also record window_start)"
+  types:
+    - event_type: VOICE_SETUP_FAILURE_RISE
+      kpi: voice_setup_failure_rate
+      target_object_type: service
+      required_attributes: [voice_service, policy_function, interface]
+      routing:
+        - candidate_sop: SOP-01
+          condition: {attribute_equals: {policy_function: PCF, interface: N5/N7}}
+          otherwise: {routing_role: context, add_flag: routing_mismatch}
+    - event_type: REGISTRATION_FAILURE_RISE
+      kpi: registration_failure_rate
+      target_object_type: service
+      routing:
+        - candidate_sop: SOP-02
+          condition:
+            companion_trigger_any: [HSS_UNREACHABLE, UDM_UNREACHABLE, SUBSCRIBER_DATA_TIMEOUT]
+            within_minutes: 15          # |companion.event_time - this.event_time| <= 15 min
+            matching_scope: [service_id, subscriber_function]
+          otherwise: {routing_role: context}
+    - event_type: AUTHENTICATION_FAILURE_RISE
+      kpi: authentication_failure_rate
+      target_object_type: service
+      routing:
+        - candidate_sop: SOP-02
+          condition:
+            companion_trigger_any: [HSS_UNREACHABLE, UDM_UNREACHABLE, SUBSCRIBER_DATA_TIMEOUT]
+            within_minutes: 15
+            matching_scope: [service_id, subscriber_function]
+          otherwise: {routing_role: context}
+    - event_type: HANDOVER_FAILURE_RISE
+      kpi: handover_failure_rate_per_source_cell
+      target_object_type: cell
+      routing:
+        - candidate_sop: SOP-04
+          condition: {follows_change: change_correlation}
+          otherwise: {routing_role: context}
+    - event_type: CALL_DROP_RISE
+      kpi: call_drop_rate
+      target_object_type: cell
+      routing:
+        - candidate_sop: SOP-05          # unconditional
+        - candidate_sop: SOP-04
+          condition: {follows_change: change_correlation}
+
+# ===========================================================================
+# 5. Correlation rules executed by enrichment
+# ===========================================================================
+correlation_rules:
+  change_correlation:
+    purpose: "Make SOP-04 eligible only after a symptom follows an executed change."
+    change_types: [RF_FREQUENCY_CHANGE, NEIGHBOUR_CONFIG_CHANGE]
+    change_status: executed
+    symptom_types: [HANDOVER_FAILURE_RISE, CALL_DROP_RISE, CNE_INCIDENT]
+    time_condition: "0 <= symptom.event_time - change.executed_time <= 30 minutes"   # event time, never ingest time
+    scope_condition: "symptom cell = changed cell, or a neighbour of it in relations valid at executed_time"
+    output: {routing_trigger: SOP04_ELIGIBLE, candidate_sop: SOP-04, links: [change.event_id, symptom.event_id]}
+
+# ===========================================================================
+# 6. Identifier aliases
+# ===========================================================================
+aliases:
+  rule: "Resolve before grouping. Unresolved IDs go to unresolved_ids; never dropped (REF-CORR.5)."
+  template_semantics: >
+    pattern is a Python regular expression with named groups. template uses
+    {group} placeholders. Each group may list transforms, applied in order.
+    Allowed transforms: upper, lower, int (strip leading zeros), zero_pad_2.
+  explicit_first: true               # explicit entries win over patterns
+  explicit:
+    - {alias: "pcf2.core", canonical: "PCF-02", note: "S6 alias-mismatch scenario"}
+  patterns:
+    - {pattern: "^pcf(?P<n>\\d+)\\.core$", template: "PCF-{n}",  transforms: {n: [int, zero_pad_2]}}
+    - {pattern: "^smf(?P<n>\\d+)\\.core$", template: "SMF-{n}",  transforms: {n: [int, zero_pad_2]}}
+    - {pattern: "^lnk-(?P<n>\\d+)$",       template: "LINK-{n}", transforms: {n: [int]}}
+    - {pattern: "^cell_(?P<x>[a-f])$",     template: "CELL-{x}", transforms: {x: [upper]}}
+  examples:
+    - {in: "pcf2.core", out: "PCF-02"}
+    - {in: "lnk-01",    out: "LINK-1"}
+    - {in: "cell_c",    out: "CELL-C"}
+
+# ===========================================================================
+# 7. Release-cause map (REF-RAN.5). Class from raw_cause, never from the answer key.
+# ===========================================================================
+release_cause_map:
+  mapping_version: "rc-0.2"
+  entries:
+    - {raw_cause: RLF_T310_EXPIRY,        class: radio}
+    - {raw_cause: HO_FAILURE_TARGET,      class: radio}
+    - {raw_cause: HO_FAILURE_WRONG_CELL,  class: radio}
+    - {raw_cause: NG_ASSOCIATION_LOST,    class: transport}
+    - {raw_cause: S1_ASSOCIATION_LOST,    class: transport}
+    - {raw_cause: UP_PATH_FAILURE,        class: transport}
+    - {raw_cause: POLICY_REJECT,          class: core}
+    - {raw_cause: CORE_INITIATED_RELEASE, class: core}
+    - {raw_cause: USER_INACTIVITY,        class: other}
+  output_fields: [raw_cause, reporting_element, mapping_version, release_cause_class, cause_mapping_status]
+  mapped: {cause_mapping_status: mapped}
+  unmapped: {release_cause_class: null, cause_mapping_status: unmapped}

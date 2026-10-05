@@ -1,0 +1,743 @@
+{
+  "catalog_version": "0.1",
+  "generated_from": [
+    "shared-rules.md",
+    "sops/SOP-01.md",
+    "sops/SOP-02.md",
+    "sops/SOP-03.md",
+    "sops/SOP-04.md",
+    "sops/SOP-05.md",
+    "reference/core-control-plane.md",
+    "reference/correlation-patterns.md",
+    "reference/ran-rf.md",
+    "reference/transport.md"
+  ],
+  "usage": "list_sections returns this tree; read_section(node_id) returns the section text.",
+  "documents": [
+    {
+      "doc_id": "RULES",
+      "file": "shared-rules.md",
+      "version": "0.5",
+      "summary": "Rules that apply to every SOP, and the trigger-to-SOP routing table. Read [RULES.1]–[RULES.9] before any SOP and [ROUTING] before selecting SOPs.",
+      "sections": [
+        {
+          "node_id": "RULES.1",
+          "title": "Route from normalized events",
+          "summary": "Read first: triggers come from the alarm dictionary and select candidate SOPs, never causes; investigation vs escalation thresholds.",
+          "file": "shared-rules.md",
+          "anchor": "[RULES.1] Route from normalized events"
+        },
+        {
+          "node_id": "RULES.2",
+          "title": "Use event time",
+          "summary": "Read when windowing or deduplicating: 15-minute event-time windows.",
+          "file": "shared-rules.md",
+          "anchor": "[RULES.2] Use event time"
+        },
+        {
+          "node_id": "RULES.3",
+          "title": "Use 5-minute windows only for persistence",
+          "summary": "Read for SOP-01 persistence: 5-minute sub-windows.",
+          "file": "shared-rules.md",
+          "anchor": "[RULES.3] Use 5-minute windows only for persistence"
+        },
+        {
+          "node_id": "RULES.4",
+          "title": "Include late events and revise findings",
+          "summary": "Read when an event arrives late or a finding may need a new report version.",
+          "file": "shared-rules.md",
+          "anchor": "[RULES.4] Include late events and revise findings"
+        },
+        {
+          "node_id": "RULES.5",
+          "title": "Apply mutually exclusive escalation tiers",
+          "summary": "Read when calculating the impact tier (severe, significant, below tiers, unknown).",
+          "file": "shared-rules.md",
+          "anchor": "[RULES.5] Apply mutually exclusive escalation tiers"
+        },
+        {
+          "node_id": "RULES.6",
+          "title": "Require adequate samples",
+          "summary": "Read before any before/after rate comparison: minimum attempts.",
+          "file": "shared-rules.md",
+          "anchor": "[RULES.6] Require adequate samples"
+        },
+        {
+          "node_id": "RULES.7",
+          "title": "Record missing evidence",
+          "summary": "Read when required data is missing: unable_to_check.",
+          "file": "shared-rules.md",
+          "anchor": "[RULES.7] Record missing evidence"
+        },
+        {
+          "node_id": "RULES.8",
+          "title": "Allow multiple causes",
+          "summary": "Read when assigning causes: multiple causes and unexplained symptoms.",
+          "file": "shared-rules.md",
+          "anchor": "[RULES.8] Allow multiple causes"
+        },
+        {
+          "node_id": "RULES.9",
+          "title": "Control changes",
+          "summary": "Read before proposing any action: read_only vs change.",
+          "file": "shared-rules.md",
+          "anchor": "[RULES.9] Control changes"
+        },
+        {
+          "node_id": "ROUTING",
+          "title": "Trigger-to-SOP routing",
+          "summary": "Read before selecting SOPs. Maps normalized triggers to candidate SOPs; all matching SOPs are recorded.",
+          "file": "shared-rules.md",
+          "anchor": "[ROUTING] Trigger-to-SOP routing"
+        }
+      ]
+    },
+    {
+      "doc_id": "SOP-01",
+      "file": "sops/SOP-01.md",
+      "version": "0.5",
+      "summary": "PCF and policy-service failures: PCF service fault vs SMF-to-PCF path vs shared dependency.",
+      "triggers": [
+        "N7_TIMEOUT",
+        "PCF_POLICY_REQUEST_FAILURE",
+        "PCF_UNREACHABLE",
+        "VOICE_SETUP_FAILURE_RISE"
+      ],
+      "doc_node": {
+        "node_id": "SOP-01",
+        "title": "PCF and policy-service failures",
+        "summary": "PCF and policy-service failures: PCF service fault vs SMF-to-PCF path vs shared dependency.",
+        "file": "sops/SOP-01.md",
+        "anchor": "[SOP-01] PCF and policy-service failures"
+      },
+      "sections": [
+        {
+          "node_id": "SOP-01.T",
+          "title": "Trigger",
+          "summary": "Read to confirm this SOP applies.",
+          "file": "sops/SOP-01.md",
+          "anchor": "[SOP-01.T] Trigger"
+        },
+        {
+          "node_id": "SOP-01.Q",
+          "title": "Investigation question",
+          "summary": "Read to frame the competing hypotheses for this SOP.",
+          "file": "sops/SOP-01.md",
+          "anchor": "[SOP-01.Q] Investigation question",
+          "step_type": "read_only"
+        },
+        {
+          "node_id": "SOP-01.1",
+          "title": "Step 1",
+          "summary": "Read when running SOP-01.1: Compare policy successes, failures, and timeouts per SMF before and after onset.",
+          "file": "sops/SOP-01.md",
+          "anchor": "[SOP-01.1] Step 1",
+          "step_type": "read_only"
+        },
+        {
+          "node_id": "SOP-01.2",
+          "title": "Step 2",
+          "summary": "Read when running SOP-01.2: Compare PCF health with reachability from each SMF.",
+          "file": "sops/SOP-01.md",
+          "anchor": "[SOP-01.2] Step 2",
+          "step_type": "read_only"
+        },
+        {
+          "node_id": "SOP-01.3",
+          "title": "Step 3",
+          "summary": "Read when running SOP-01.3: Compare mapped service and customer/session outcomes.",
+          "file": "sops/SOP-01.md",
+          "anchor": "[SOP-01.3] Step 3",
+          "step_type": "read_only"
+        },
+        {
+          "node_id": "SOP-01.4",
+          "title": "Step 4",
+          "summary": "Read when running SOP-01.4: Review shared transport and change events.",
+          "file": "sops/SOP-01.md",
+          "anchor": "[SOP-01.4] Step 4",
+          "step_type": "read_only"
+        },
+        {
+          "node_id": "SOP-01.E",
+          "title": "Persistence and escalation",
+          "summary": "Read when deciding persistence and escalation for SOP-01.",
+          "file": "sops/SOP-01.md",
+          "anchor": "[SOP-01.E] Persistence and escalation"
+        },
+        {
+          "node_id": "SOP-01.C",
+          "title": "Change boundary",
+          "summary": "Read when deciding change boundary for SOP-01.",
+          "file": "sops/SOP-01.md",
+          "anchor": "[SOP-01.C] Change boundary"
+        }
+      ]
+    },
+    {
+      "doc_id": "SOP-02",
+      "file": "sops/SOP-02.md",
+      "version": "0.5",
+      "summary": "HSS or UDM subscriber-data failures: named function vs consumer path vs shared dependency (including UDR).",
+      "triggers": [
+        "HSS_UNREACHABLE",
+        "SUBSCRIBER_DATA_TIMEOUT",
+        "UDM_UNREACHABLE"
+      ],
+      "doc_node": {
+        "node_id": "SOP-02",
+        "title": "HSS or UDM subscriber-data failures",
+        "summary": "HSS or UDM subscriber-data failures: named function vs consumer path vs shared dependency (including UDR).",
+        "file": "sops/SOP-02.md",
+        "anchor": "[SOP-02] HSS or UDM subscriber-data failures"
+      },
+      "sections": [
+        {
+          "node_id": "SOP-02.T",
+          "title": "Trigger",
+          "summary": "Read to confirm this SOP applies.",
+          "file": "sops/SOP-02.md",
+          "anchor": "[SOP-02.T] Trigger"
+        },
+        {
+          "node_id": "SOP-02.Q",
+          "title": "Investigation question",
+          "summary": "Read to frame the competing hypotheses for this SOP.",
+          "file": "sops/SOP-02.md",
+          "anchor": "[SOP-02.Q] Investigation question",
+          "step_type": "read_only"
+        },
+        {
+          "node_id": "SOP-02.1",
+          "title": "Step 1",
+          "summary": "Read when running SOP-02.1: Identify function, consumers, error codes, and event times.",
+          "file": "sops/SOP-02.md",
+          "anchor": "[SOP-02.1] Step 1",
+          "step_type": "read_only"
+        },
+        {
+          "node_id": "SOP-02.2",
+          "title": "Step 2",
+          "summary": "Read when running SOP-02.2: Compare function health with consumer-to-function reachability.",
+          "file": "sops/SOP-02.md",
+          "anchor": "[SOP-02.2] Step 2",
+          "step_type": "read_only"
+        },
+        {
+          "node_id": "SOP-02.3",
+          "title": "Step 3",
+          "summary": "Read when running SOP-02.3: Compare registration and authentication successes and failures before and after onset.",
+          "file": "sops/SOP-02.md",
+          "anchor": "[SOP-02.3] Step 3",
+          "step_type": "read_only"
+        },
+        {
+          "node_id": "SOP-02.4",
+          "title": "Step 4",
+          "summary": "Read when running SOP-02.4: Check dependent links and recent changes.",
+          "file": "sops/SOP-02.md",
+          "anchor": "[SOP-02.4] Step 4",
+          "step_type": "read_only"
+        },
+        {
+          "node_id": "SOP-02.E",
+          "title": "Escalation",
+          "summary": "Read when deciding escalation for SOP-02.",
+          "file": "sops/SOP-02.md",
+          "anchor": "[SOP-02.E] Escalation"
+        },
+        {
+          "node_id": "SOP-02.C",
+          "title": "Change boundary",
+          "summary": "Read when deciding change boundary for SOP-02.",
+          "file": "sops/SOP-02.md",
+          "anchor": "[SOP-02.C] Change boundary"
+        }
+      ]
+    },
+    {
+      "doc_id": "SOP-03",
+      "file": "sops/SOP-03.md",
+      "version": "0.5",
+      "summary": "Backhaul link flap: transition counting, dependent vs control cells, continuing-flap threshold.",
+      "triggers": [
+        "LINK_DOWN",
+        "LINK_UP",
+        "TRANSPORT_LINK_FLAP"
+      ],
+      "doc_node": {
+        "node_id": "SOP-03",
+        "title": "Backhaul link flap",
+        "summary": "Backhaul link flap: transition counting, dependent vs control cells, continuing-flap threshold.",
+        "file": "sops/SOP-03.md",
+        "anchor": "[SOP-03] Backhaul link flap"
+      },
+      "sections": [
+        {
+          "node_id": "SOP-03.T",
+          "title": "Trigger",
+          "summary": "Read to confirm this SOP applies.",
+          "file": "sops/SOP-03.md",
+          "anchor": "[SOP-03.T] Trigger"
+        },
+        {
+          "node_id": "SOP-03.Q",
+          "title": "Investigation question",
+          "summary": "Read to frame the competing hypotheses for this SOP.",
+          "file": "sops/SOP-03.md",
+          "anchor": "[SOP-03.Q] Investigation question",
+          "step_type": "read_only"
+        },
+        {
+          "node_id": "SOP-03.1",
+          "title": "Step 1",
+          "summary": "Read when running SOP-03.1: Deduplicate and count link state transitions.",
+          "file": "sops/SOP-03.md",
+          "anchor": "[SOP-03.1] Step 1",
+          "step_type": "read_only"
+        },
+        {
+          "node_id": "SOP-03.2",
+          "title": "Step 2",
+          "summary": "Read when running SOP-03.2: Read cell-to-link and service-to-link mappings.",
+          "file": "sops/SOP-03.md",
+          "anchor": "[SOP-03.2] Step 2",
+          "step_type": "read_only"
+        },
+        {
+          "node_id": "SOP-03.3",
+          "title": "Step 3",
+          "summary": "Read when running SOP-03.3: Compare outcomes on dependent cells with control cells not served by the flapping link, that share no upstream segment with the affected cells, and that have no coincident RF change or RF exposure (REF-TX.1).",
+          "file": "sops/SOP-03.md",
+          "anchor": "[SOP-03.3] Step 3",
+          "step_type": "read_only"
+        },
+        {
+          "node_id": "SOP-03.4",
+          "title": "Step 4",
+          "summary": "Read when running SOP-03.4: Inspect coincident RF changes and other transport faults.",
+          "file": "sops/SOP-03.md",
+          "anchor": "[SOP-03.4] Step 4",
+          "step_type": "read_only"
+        },
+        {
+          "node_id": "SOP-03.E",
+          "title": "Escalation",
+          "summary": "Read when deciding escalation for SOP-03.",
+          "file": "sops/SOP-03.md",
+          "anchor": "[SOP-03.E] Escalation"
+        },
+        {
+          "node_id": "SOP-03.B",
+          "title": "Below-threshold outcome",
+          "summary": "Read when deciding below-threshold outcome for SOP-03.",
+          "file": "sops/SOP-03.md",
+          "anchor": "[SOP-03.B] Below-threshold outcome"
+        },
+        {
+          "node_id": "SOP-03.C",
+          "title": "Change boundary",
+          "summary": "Read when deciding change boundary for SOP-03.",
+          "file": "sops/SOP-03.md",
+          "anchor": "[SOP-03.C] Change boundary"
+        }
+      ]
+    },
+    {
+      "doc_id": "SOP-04",
+      "file": "sops/SOP-04.md",
+      "version": "0.5",
+      "summary": "Handover failures after an RF change: interference, PCI and neighbour/measurement-configuration mechanisms.",
+      "triggers": [
+        "CALL_DROP_RISE",
+        "HANDOVER_FAILURE_RISE",
+        "NEIGHBOUR_CONFIG_CHANGE",
+        "RF_FREQUENCY_CHANGE"
+      ],
+      "doc_node": {
+        "node_id": "SOP-04",
+        "title": "Handover failures after an RF change",
+        "summary": "Handover failures after an RF change: interference, PCI and neighbour/measurement-configuration mechanisms.",
+        "file": "sops/SOP-04.md",
+        "anchor": "[SOP-04] Handover failures after an RF change"
+      },
+      "sections": [
+        {
+          "node_id": "SOP-04.T",
+          "title": "Trigger",
+          "summary": "Read to confirm this SOP applies.",
+          "file": "sops/SOP-04.md",
+          "anchor": "[SOP-04.T] Trigger"
+        },
+        {
+          "node_id": "SOP-04.Q",
+          "title": "Investigation question",
+          "summary": "Read to frame the competing hypotheses for this SOP.",
+          "file": "sops/SOP-04.md",
+          "anchor": "[SOP-04.Q] Investigation question",
+          "step_type": "read_only"
+        },
+        {
+          "node_id": "SOP-04.1",
+          "title": "Step 1",
+          "summary": "Read when running SOP-04.1: Read changed cell, old/new setting, change time, and neighbour relations.",
+          "file": "sops/SOP-04.md",
+          "anchor": "[SOP-04.1] Step 1",
+          "step_type": "read_only"
+        },
+        {
+          "node_id": "SOP-04.2",
+          "title": "Step 2",
+          "summary": "Read when running SOP-04.2: Compare per-cell handover attempts and failures before and after the change.",
+          "file": "sops/SOP-04.md",
+          "anchor": "[SOP-04.2] Step 2",
+          "step_type": "read_only"
+        },
+        {
+          "node_id": "SOP-04.3",
+          "title": "Step 3",
+          "summary": "Read when running SOP-04.3: Interference mechanism only.",
+          "file": "sops/SOP-04.md",
+          "anchor": "[SOP-04.3] Step 3",
+          "step_type": "read_only"
+        },
+        {
+          "node_id": "SOP-04.4",
+          "title": "Step 4",
+          "summary": "Read when running SOP-04.4: Inspect mapped transport links and link events.",
+          "file": "sops/SOP-04.md",
+          "anchor": "[SOP-04.4] Step 4",
+          "step_type": "read_only"
+        },
+        {
+          "node_id": "SOP-04.5",
+          "title": "Step 5",
+          "summary": "Read when running SOP-04.5: Check PCI and carrier assignments for the changed cell and its neighbours, neighbour relations, measurement configuration for the new frequency, and handover outcomes by stage (preparation vs execution).",
+          "file": "sops/SOP-04.md",
+          "anchor": "[SOP-04.5] Step 5",
+          "step_type": "read_only"
+        },
+        {
+          "node_id": "SOP-04.E",
+          "title": "Escalation",
+          "summary": "Read when deciding escalation for SOP-04.",
+          "file": "sops/SOP-04.md",
+          "anchor": "[SOP-04.E] Escalation"
+        },
+        {
+          "node_id": "SOP-04.C",
+          "title": "Change boundary",
+          "summary": "Read when deciding change boundary for SOP-04.",
+          "file": "sops/SOP-04.md",
+          "anchor": "[SOP-04.C] Change boundary"
+        }
+      ]
+    },
+    {
+      "doc_id": "SOP-05",
+      "file": "sops/SOP-05.md",
+      "version": "0.5",
+      "summary": "Customer network experience and multi-cause triage: impact groups, attribution states, unexplained symptoms.",
+      "triggers": [
+        "CALL_DROP_RISE",
+        "CNE_INCIDENT",
+        "CUSTOMER_COMPLAINT"
+      ],
+      "doc_node": {
+        "node_id": "SOP-05",
+        "title": "Customer network experience and multi-cause triage",
+        "summary": "Customer network experience and multi-cause triage: impact groups, attribution states, unexplained symptoms.",
+        "file": "sops/SOP-05.md",
+        "anchor": "[SOP-05] Customer network experience and multi-cause triage"
+      },
+      "sections": [
+        {
+          "node_id": "SOP-05.T",
+          "title": "Trigger",
+          "summary": "Read to confirm this SOP applies.",
+          "file": "sops/SOP-05.md",
+          "anchor": "[SOP-05.T] Trigger"
+        },
+        {
+          "node_id": "SOP-05.Q",
+          "title": "Investigation question",
+          "summary": "Read to frame the competing hypotheses for this SOP.",
+          "file": "sops/SOP-05.md",
+          "anchor": "[SOP-05.Q] Investigation question",
+          "step_type": "read_only"
+        },
+        {
+          "node_id": "SOP-05.1",
+          "title": "Step 1",
+          "summary": "Read when running SOP-05.1: Group distinct affected customers by cell, service, and 15-minute event-time window.",
+          "file": "sops/SOP-05.md",
+          "anchor": "[SOP-05.1] Step 1",
+          "step_type": "read_only"
+        },
+        {
+          "node_id": "SOP-05.2",
+          "title": "Step 2",
+          "summary": "Read when running SOP-05.2: Run relevant domain SOPs and keep their findings and citations separate.",
+          "file": "sops/SOP-05.md",
+          "anchor": "[SOP-05.2] Step 2",
+          "step_type": "read_only"
+        },
+        {
+          "node_id": "SOP-05.3",
+          "title": "Step 3",
+          "summary": "Read when running SOP-05.3: Assign each material symptom to one of four states: single (one supported candidate), multiple (several candidates, each with its own mechanism evidence), unresolved (contributions cannot be separated), or unexplained.",
+          "file": "sops/SOP-05.md",
+          "anchor": "[SOP-05.3] Step 3",
+          "step_type": "read_only"
+        },
+        {
+          "node_id": "SOP-05.4",
+          "title": "Step 4",
+          "summary": "Read when running SOP-05.4: Calculate the impact tier from distinct customers and enterprise flags.",
+          "file": "sops/SOP-05.md",
+          "anchor": "[SOP-05.4] Step 4",
+          "step_type": "read_only"
+        },
+        {
+          "node_id": "SOP-05.E",
+          "title": "Escalation",
+          "summary": "Read when deciding escalation for SOP-05.",
+          "file": "sops/SOP-05.md",
+          "anchor": "[SOP-05.E] Escalation"
+        },
+        {
+          "node_id": "SOP-05.O",
+          "title": "Output",
+          "summary": "Read when deciding output for SOP-05.",
+          "file": "sops/SOP-05.md",
+          "anchor": "[SOP-05.O] Output"
+        }
+      ]
+    },
+    {
+      "doc_id": "REF-CORE",
+      "file": "reference/core-control-plane.md",
+      "version": "0.3",
+      "summary": "Definitions and failure semantics for PCF, SMF, UDM, UDR, HSS, NRF and SCP that SOP-01 and SOP-02 rely on. Read a section only when a SOP step needs the meaning of an interface, function or symptom.",
+      "sections": [
+        {
+          "node_id": "REF-CORE.1",
+          "title": "Function roles",
+          "summary": "Read to identify which core function owns which job before forming a hypothesis.",
+          "file": "reference/core-control-plane.md",
+          "anchor": "[REF-CORE.1] Function roles"
+        },
+        {
+          "node_id": "REF-CORE.2",
+          "title": "N7 and policy requests (SMF to PCF)",
+          "summary": "Read when N7_TIMEOUT or PCF_POLICY_REQUEST_FAILURE appears, to understand which session operations depend on policy.",
+          "file": "reference/core-control-plane.md",
+          "anchor": "[REF-CORE.2] N7 and policy requests (SMF to PCF)"
+        },
+        {
+          "node_id": "REF-CORE.3",
+          "title": "Voice dependency on policy (VoLTE / VoNR)",
+          "summary": "Read when VOLTE_SETUP_FAILURE_RISE coincides with policy failures, to decide whether the voice failures depend on the policy path under investigation.",
+          "file": "reference/core-control-plane.md",
+          "anchor": "[REF-CORE.3] Voice dependency on policy (VoLTE / VoNR)"
+        },
+        {
+          "node_id": "REF-CORE.4",
+          "title": "PCF service fault vs single-path fault",
+          "summary": "Read during SOP-01.1 and SOP-01.2 to interpret per-SMF failure patterns.",
+          "file": "reference/core-control-plane.md",
+          "anchor": "[REF-CORE.4] PCF service fault vs single-path fault"
+        },
+        {
+          "node_id": "REF-CORE.5",
+          "title": "HSS / UDM failure semantics",
+          "summary": "Read when HSS_UNREACHABLE, UDM_UNREACHABLE or SUBSCRIBER_DATA_TIMEOUT appears, to see which procedures depend on the named function.",
+          "file": "reference/core-control-plane.md",
+          "anchor": "[REF-CORE.5] HSS / UDM failure semantics"
+        },
+        {
+          "node_id": "REF-CORE.6",
+          "title": "Discovery and communication models",
+          "summary": "Read when several network functions appear unreachable at once and no single function looks unhealthy.",
+          "file": "reference/core-control-plane.md",
+          "anchor": "[REF-CORE.6] Discovery and communication models"
+        },
+        {
+          "node_id": "REF-CORE.7",
+          "title": "N4 / PFCP failures",
+          "summary": "Read when PFCP path failures appear, possibly alongside GTP-C alarms.",
+          "file": "reference/core-control-plane.md",
+          "anchor": "[REF-CORE.7] N4 / PFCP failures"
+        },
+        {
+          "node_id": "REF-CORE.8",
+          "title": "Normalized triggers used by this domain",
+          "summary": "Read to confirm what a normalized core trigger means.",
+          "file": "reference/core-control-plane.md",
+          "anchor": "[REF-CORE.8] Normalized triggers used by this domain"
+        },
+        {
+          "node_id": "REF-CORE.9",
+          "title": "Evidence the core checks need",
+          "summary": "Read to judge whether a core step can be run or must be recorded as unable_to_check.",
+          "file": "reference/core-control-plane.md",
+          "anchor": "[REF-CORE.9] Evidence the core checks need"
+        }
+      ]
+    },
+    {
+      "doc_id": "REF-CORR",
+      "file": "reference/correlation-patterns.md",
+      "version": "0.3",
+      "summary": "How to treat candidate root causes versus symptoms, shared versus independent faults, and evidence versus coincidence. Used mainly by SOP-05, and by any SOP with competing hypotheses.",
+      "sections": [
+        {
+          "node_id": "REF-CORR.1",
+          "title": "Cascades and the earliest-event heuristic",
+          "summary": "Read when many alarms arrive in a short window and may share one cause.",
+          "file": "reference/correlation-patterns.md",
+          "anchor": "[REF-CORR.1] Cascades and the earliest-event heuristic"
+        },
+        {
+          "node_id": "REF-CORR.2",
+          "title": "Shared-fault vs independent-fault hypotheses",
+          "summary": "Read whenever more than one hypothesis is plausible for the same window (S3, S4).",
+          "file": "reference/correlation-patterns.md",
+          "anchor": "[REF-CORR.2] Shared-fault vs independent-fault hypotheses"
+        },
+        {
+          "node_id": "REF-CORR.3",
+          "title": "Flaps, transients and sustained faults",
+          "summary": "Read when events repeat or clear quickly.",
+          "file": "reference/correlation-patterns.md",
+          "anchor": "[REF-CORR.3] Flaps, transients and sustained faults"
+        },
+        {
+          "node_id": "REF-CORR.4",
+          "title": "Change-induced degradation",
+          "summary": "Read when a configuration or RF change precedes the symptoms.",
+          "file": "reference/correlation-patterns.md",
+          "anchor": "[REF-CORR.4] Change-induced degradation"
+        },
+        {
+          "node_id": "REF-CORR.5",
+          "title": "Coincidence and data traps",
+          "summary": "Read when evidence looks convincing but may be misleading.",
+          "file": "reference/correlation-patterns.md",
+          "anchor": "[REF-CORR.5] Coincidence and data traps"
+        },
+        {
+          "node_id": "REF-CORR.6",
+          "title": "Attribution and the unexplained remainder",
+          "summary": "Read during SOP-05.3 when assigning every affected object.",
+          "file": "reference/correlation-patterns.md",
+          "anchor": "[REF-CORR.6] Attribution and the unexplained remainder"
+        },
+        {
+          "node_id": "REF-CORR.7",
+          "title": "Typical evidence by fault type",
+          "summary": "Read for a one-table comparison of the evidence that typically supports each hypothesis type. Tendencies, not requirements.",
+          "file": "reference/correlation-patterns.md",
+          "anchor": "[REF-CORR.7] Typical evidence by fault type"
+        }
+      ]
+    },
+    {
+      "doc_id": "REF-RAN",
+      "file": "reference/ran-rf.md",
+      "version": "0.3",
+      "summary": "Handover KPI definitions, the RF mechanisms by which a frequency or neighbour change can cause failures, and the evidence each mechanism needs. Used by SOP-04 and SOP-05.",
+      "sections": [
+        {
+          "node_id": "REF-RAN.1",
+          "title": "Handover KPI definitions",
+          "summary": "Read during SOP-04.2 to compute and compare handover failure rates reproducibly.",
+          "file": "reference/ran-rf.md",
+          "anchor": "[REF-RAN.1] Handover KPI definitions"
+        },
+        {
+          "node_id": "REF-RAN.2",
+          "title": "Candidate mechanisms after a frequency or neighbour change",
+          "summary": "Read when RF_FREQUENCY_CHANGE or NEIGHBOUR_CONFIG_CHANGE precedes handover failures or call drops. Each mechanism needs its own evidence.",
+          "file": "reference/ran-rf.md",
+          "anchor": "[REF-RAN.2] Candidate mechanisms after a frequency or neighbour change"
+        },
+        {
+          "node_id": "REF-RAN.3",
+          "title": "Radio quality measurements",
+          "summary": "Read during SOP-04.3 to interpret SINR, CQI, BLER and related measurements reproducibly.",
+          "file": "reference/ran-rf.md",
+          "anchor": "[REF-RAN.3] Radio quality measurements"
+        },
+        {
+          "node_id": "REF-RAN.4",
+          "title": "Spatial pattern",
+          "summary": "Read to decide whether degradation follows an RF neighbourhood or some other dependency.",
+          "file": "reference/ran-rf.md",
+          "anchor": "[REF-RAN.4] Spatial pattern"
+        },
+        {
+          "node_id": "REF-RAN.5",
+          "title": "Release causes and provenance",
+          "summary": "Read when separating radio-caused from transport- or core-caused drops.",
+          "file": "reference/ran-rf.md",
+          "anchor": "[REF-RAN.5] Release causes and provenance"
+        },
+        {
+          "node_id": "REF-RAN.6",
+          "title": "Evidence the RAN checks need",
+          "summary": "Read to judge whether a RAN step can be run or must be recorded as unable_to_check.",
+          "file": "reference/ran-rf.md",
+          "anchor": "[REF-RAN.6] Evidence the RAN checks need"
+        }
+      ]
+    },
+    {
+      "doc_id": "REF-TX",
+      "file": "reference/transport.md",
+      "version": "0.3",
+      "summary": "Backhaul dependencies, how to count link state transitions, and what transport faults can do to RAN and core. Used by SOP-03, SOP-04.4 and SOP-05.",
+      "sections": [
+        {
+          "node_id": "REF-TX.1",
+          "title": "Backhaul dependencies and control cells",
+          "summary": "Read before attributing any cell or service to a link, or choosing control cells. Impact can only follow dependencies that were active at incident time.",
+          "file": "reference/transport.md",
+          "anchor": "[REF-TX.1] Backhaul dependencies and control cells"
+        },
+        {
+          "node_id": "REF-TX.2",
+          "title": "Link state model and transition counting",
+          "summary": "Read during SOP-03.1 to count transitions correctly.",
+          "file": "reference/transport.md",
+          "anchor": "[REF-TX.2] Link state model and transition counting"
+        },
+        {
+          "node_id": "REF-TX.3",
+          "title": "What a backhaul fault can do downstream",
+          "summary": "Read when deciding whether cell or customer symptoms are consistent with a transport cause.",
+          "file": "reference/transport.md",
+          "anchor": "[REF-TX.3] What a backhaul fault can do downstream"
+        },
+        {
+          "node_id": "REF-TX.4",
+          "title": "Transport vs RF: competing hypotheses",
+          "summary": "Read when transport and RF hypotheses compete for the same cells (S3, S4).",
+          "file": "reference/transport.md",
+          "anchor": "[REF-TX.4] Transport vs RF: competing hypotheses"
+        },
+        {
+          "node_id": "REF-TX.5",
+          "title": "Evidence the transport checks need",
+          "summary": "Read to judge whether a transport step can be run or must be recorded as unable_to_check.",
+          "file": "reference/transport.md",
+          "anchor": "[REF-TX.5] Evidence the transport checks need"
+        }
+      ]
+    }
+  ],
+  "counts": {
+    "documents": 10,
+    "sections": 79
+  }
+}

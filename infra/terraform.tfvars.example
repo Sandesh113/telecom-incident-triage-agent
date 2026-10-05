@@ -1,0 +1,21 @@
+# Copy to terraform.tfvars and fill in. terraform.tfvars is gitignored.
+
+aws_profile  = "poc"
+region       = "eu-north-1"               # verified: AgentCore + Bedrock reachable here
+budget_email = "sandesh113@gmail.com"     # required: budgets/anomaly alerts
+report_email = "oslonorway257@gmail.com"  # optional: leave "" to add the SNS subscription later
+
+# Confirmed by preflight.sh / scripts/send_test.sh (17/19 on the representative telecom test):
+bedrock_model_id            = "eu.anthropic.claude-sonnet-4-5-20250929-v1:0"
+bedrock_foundation_model_id = "anthropic.claude-sonnet-4-5-20250929-v1:0"
+
+budget_limits_usd      = [13, 26] # ~£10 and ~£20
+create_anomaly_monitor = true     # set false if apply says a SERVICE monitor already exists
+
+# Step 1 apply: false. After the agent artifact is built and pushed: true.
+deploy_agent_runtime = false
+
+# "code" = direct code deployment (no Docker). "container" = image in ECR (fallback).
+deploy_mode      = "code"
+agent_code_key   = "agent-code/main.zip"
+agent_image_tag  = "v0" # only read when deploy_mode = "container"
