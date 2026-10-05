@@ -1,6 +1,6 @@
 # Telecom Incident Triage Agent — AWS AgentCore PoC
 
-A proof-of-concept AI agent that triages telecom network incidents — correlating alarms, walking SOPs, and drafting a root-cause report for an engineer — built end-to-end on AWS Bedrock AgentCore. It follows the architecture described in the AWS for Industries blog post ["Building AI Agents for Telecom Network Operations"](https://aws.amazon.com/blogs/industries/), deployed as a real, traceable pipeline rather than a notebook demo.
+A proof-of-concept AI agent that triages telecom network incidents — correlating alarms, walking SOPs, and drafting a root-cause report for an engineer — built end-to-end on AWS Bedrock AgentCore.
 
 > **Live demo:** [Incident Triage Walkthrough](https://claude.ai/artifact/1ZW6cGpLxXsGpYrGd9Sn9V) — an animated, narrated walk-through of the pipeline, built to explain the architecture without needing AWS console access.
 
