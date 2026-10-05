@@ -2,7 +2,7 @@
 
 A proof-of-concept AI agent that triages telecom network incidents, correlates alarms, walks through SOPs, and drafts a root-cause report for an engineer, built end-to-end on AWS Bedrock AgentCore.
 
-> 🎬 **Live demo:** [Incident Triage Walkthrough](https://claude.ai/artifact/1ZW6cGpLxXsGpYrGd9Sn9V) An animated, narrated walk-through of the pipeline, built to explain the architecture without needing AWS console access.
+> 🎬 **Live demo:** [Incident Triage Walkthrough](https://claude.ai/artifact/1ZW6cGpLxXsGpYrGd9Sn9V) An animated, narrated walkthrough of the pipeline, built to explain the architecture without needing AWS console access.
 
 ---
 
@@ -135,7 +135,7 @@ sop-rca/
 
 ## 🚀 Deployment model
 
-- **Infrastructure:** Terraform only; every resource tagged `project=sop-rca`, plan reviewed before every apply, nothing created via CLI or console.
+- **Infrastructure:** Terraform only; every resource tagged `project=sop-rca`, plan reviewed before every apply.
 - **Agent deployment:** direct AgentCore *code* deployment: a Python zip shipped to S3, no Docker, no ECR in the default path (container deployment is kept only as a documented fallback).
 - **Knowledge sync:** `scripts/sync_knowledge.sh` pushes only `SKILL.md`, `catalog.json`, `shared-rules.md`, `sops/`, and `reference/` to S3; the IAM role the agent runs under cannot read anything else.
 - **Data separation:** scenario inputs, the evaluation oracle, and the alarm dictionary are enrichment-only and are never uploaded to S3 or made agent-readable; the agent is evaluated, not given the answer key.
@@ -156,7 +156,7 @@ This isn't a design doc; it's been run end-to-end on a real AWS account (`eu-nor
 This is a proof of concept built to demonstrate one specific architectural pattern end-to-end, not a production NOC tool:
 
 - Knowledge is static reference-file tables (topology, function dependencies, RF neighbour relations) rather than a live, queryable topology service, intentionally matching the blog's reference-layer pattern rather than adding a bespoke graph service.
-- Evidence (events, KPIs, changes) comes from a fixed synthetic dataset for a demo network ("Albion Mobile"), not a live OSS/BSS feed.
+- Evidence (events, KPIs, changes) comes from a fixed synthetic dataset for a demo network, not a live OSS/BSS feed.
 - The agent only *drafts* a report and proposed actions; it cannot execute a network change, and every proposed action is explicitly typed `read_only` or `change` with an approval flag.
 - Retrieval is vectorless; a long-tail knowledge base (the blog's third layer) is designed for but not implemented here.
 
