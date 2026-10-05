@@ -1,15 +1,12 @@
-# Deployment guide
-> **Verified — 5 October 2026:** this guide follows the current investigation agent on AWS (runtime version 4). The key GitHub investigation files match the working project. Older local portfolio copies may still contain the smoke responder: use the current repository with `agent/runtime.py`, `agent/tools.py`, `agent/validation.py`, `evidence/`, `simulator/`, updated dependencies, and the updated ZIP, event-publisher and Lambda-shim code. Stop if those files are absent.
-
 This guide describes the verified direct ZIP deployment and transport alarm demo. Run commands from the repository root in Git Bash, WSL, macOS or Linux unless marked PowerShell. It does not deploy anything automatically.
 
-The alarm simulator currently restricts AWS writes to the original approved PoC account and resources tagged `project=sop-rca`. This is not yet a turnkey separate-account deployment guide: a separate account needs an intentional review of that guard before using the simulator. Never copy the existing account's Terraform state to another account.
+The alarm simulator currently restricts AWS writes to the original approved PoC account and resources tagged `project=sop-rca`. This is not yet a turnkey separate-account deployment guide: before using the simulator in a separate account, intentionally review that guard. Never copy the existing account's Terraform state to another account.
 
 ## 1. Prerequisites
 
 Install AWS CLI v2, Terraform 1.6+, Python 3.13, uv and Git. The verified ZIP path does not require Docker. Put uv on PATH before using the Bash packaging script.
 
-Use the working non-root AWS CLI profile; the existing PoC uses `default`. The verified Region is `eu-north-1` and the configured model is Claude Sonnet 4.5. Changing accounts, Regions or models requires checking availability and access first.
+Use the working non-root AWS CLI profile; the existing PoC uses `default`. The verified Region is `eu-north-1`, and the configured model is Claude Sonnet 4.5. Changing accounts, regions, or models requires checking availability and access first.
 
 ```bash
 export AWS_PROFILE=default
@@ -42,7 +39,7 @@ deploy_mode          = "code"
 enable_observability = false
 ```
 
-The public configuration defaults to observability disabled and 10% indexing; the existing working PoC defaults to enabled and 100%. Set these values explicitly for a new deployment. The false value above leaves the account-wide Transaction Search resources unmanaged during initial setup. For the existing approved deployment, retain its reviewed observability configuration; do not toggle it off as part of a routine code update.
+The current GitHub and working-project Terraform defaults enable observability with 100% indexing; older sanitised local copies may default to disabled and 10%. Set these values explicitly for a new deployment. The false value above leaves the account-wide Transaction Search resources unmanaged during initial setup. For the existing approved deployment, retain its reviewed observability configuration; do not toggle it off as part of a routine code update.
 
 ## 3. Run preflight
 
@@ -63,10 +60,10 @@ git diff --exit-code -- knowledge/catalog.json
 terraform -chdir=infra init
 terraform -chdir=infra fmt -check
 terraform -chdir=infra validate
-uv run python -m simulator.transport
+uv run python -m simulator. transport
 ```
 
-Local replay generates raw alarms, normalized evidence and an ingestion audit under ignored `runs/alarm-replays/`; it does not invoke the model or access AWS. Catalog rebuilding must exit zero and match the committed index. Resolve formatting or validation failures before planning. If `fmt -check` lists files, run `terraform -chdir=infra fmt`, inspect the formatting diff, and repeat the check. Existing provider/dependency deprecation warnings should be distinguished from failures.
+Local replay generates raw alarms, normalised evidence and an ingestion audit under ignored `runs/alarm-replays/`; it does not invoke the model or access AWS. Catalogue rebuilding must exit zero and match the committed index. Resolve formatting or validation failures before planning. If `fmt -check` lists files, run `terraform -chdir=infra fmt`, inspect the formatting diff, and repeat the check. Existing provider/dependency deprecation warnings should be distinguished from failures.
 
 ## 5. Create cost guardrails first
 
@@ -147,7 +144,7 @@ For the existing Windows PoC, the PowerShell shortcut is:
 .\scripts\simulate_network_alarm.ps1 -Aws
 ```
 
-That wrapper selects the `default` profile. The simulator checks the approved account and project tags, normalizes vendor A/B LINK-1 alarms, loads matching synthetic evidence, then publishes `incident.ready` only after loading succeeds. It prints the incident ID, run UUID and local output folder.
+That wrapper selects the `default` profile. The simulator checks the approved account and project tags, normalises vendor A/B LINK-1 alarms, loads matching synthetic evidence, then publishes `incident.ready` only after loading succeeds. It prints the incident ID, run UUID and local output folder.
 
 ```bash
 aws logs tail /aws/lambda/sop-rca-invoke-agent --follow
@@ -161,7 +158,7 @@ aws s3 ls "s3://$(terraform -chdir=infra output -raw data_bucket)/reports/" --re
 
 Inspect the report for the exact incident/run printed by the simulator. Success means `status = validated`, no validation errors, cited SOP steps and section reads in the tool audit, a saved S3 report and an SNS email containing the investigation JSON plus its S3 pointer. An oversized inline report explicitly falls back to a pointer. HTTP 200 alone does not prove report validation. The old `skill_loaded` flag is no longer part of this report format.
 
-Do not use `load_test_incident.sh` for the current investigation agent: it writes the old skeleton fixture. To resend an event for already loaded normalized evidence, pass both identifiers:
+Do not use `load_test_incident.sh` for the current investigation agent: it writes the old skeleton fixture. To resend an event for already loaded normalised evidence, pass both identifiers:
 
 ```bash
 bash scripts/send_test_event.sh <incident_id> <loaded_run_id>
@@ -178,7 +175,7 @@ enable_observability       = true
 trace_indexing_percentage = 100
 ```
 
-Review a new Terraform plan and summary before applying it. One hundred percent indexing is the demo setting; choose a lower percentage for ongoing use. The agent package includes aws-opentelemetry-distro and uses the entry point `["opentelemetry-instrument", "main.py"]`. No additional OTEL environment variables are configured by this repository.
+Review a new Terraform plan and summary before applying it. One hundred per cent indexing is the demo setting; choose a lower percentage for ongoing use. The agent package includes aws-opentelemetry-distro and uses the entry point `["opentelemetry-instrument", "main.py"]`. No additional OTEL environment variables are configured by this repository.
 
 In the target Region, inspect CloudWatch GenAI Observability for the agent and Application Signals / Transaction Search for the request's trace and service map. Search within the smoke-test time window. Span count varies by investigation; the historical 17-span skeleton trace is not a current acceptance threshold.
 
@@ -192,7 +189,7 @@ terraform -chdir=infra apply tfplan-destroy
 bash scripts/verify_destroy.sh
 ```
 
-Transaction Search resources are account-wide. Review their effect on other applications before teardown, and check the resulting configuration afterward:
+Transaction Search resources are account-wide. Review their effect on other applications before teardown, and check the resulting configuration afterwards:
 
 ```bash
 aws xray get-trace-segment-destination
