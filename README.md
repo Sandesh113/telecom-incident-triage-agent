@@ -8,14 +8,14 @@ A proof-of-concept AI agent that triages telecom network incidents, correlates a
 
 ## 🎯 Why this exists
 
-Telecom NOC teams drown in correlated alarms during an incident, a single root cause (a flapping backhaul link, a failed policy function, an RF configuration change) can fan out into dozens of symptom alarms across cells, services, and customers. This PoC shows an AI agent that:
+Telecom NOC teams drown in correlated alarms during an incident; a single root cause (a flapping backhaul link, a failed policy function, an RF configuration change) can fan out into dozens of symptom alarms across cells, services, and customers. This PoC shows an AI agent that:
 
 - Reads enriched incident events, not raw unstructured logs.
 - Routes to the right Standard Operating Procedure (SOP) based on alarm triggers.
 - Investigates each hypothesis against **cited, versioned domain knowledge**, not a black box.
 - Produces a structured, auditable report: hypotheses, evidence, attribution, and impact tier, never a free-text guess, and never a network-changing action on its own.
 
-It is deliberately scoped as a **PoC for a specific architectural pattern**, not a production system, see [Scope and limitations](#scope-and-limitations).
+It is deliberately scoped as a **PoC for a specific architectural pattern**, not a production system; see [Scope and limitations](#scope-and-limitations).
 
 ---
 
@@ -73,7 +73,7 @@ Given an incident's enriched events, the agent:
 5. Tests each hypothesis against the relevant reference-file relationship (function dependencies, backhaul mappings, RF neighbour tables) and executed change records — timing alone never proves causality.
 6. Assigns every affected object an attribution state: `single`, `multiple`, `unresolved`, or `unexplained`.
 7. Calculates an impact tier from distinct/enterprise customer counts.
-8. Emits a structured JSON report with hypotheses, cited evidence, attribution, impact, and any proposed actions (always flagged `read_only` or `change`, with `requires_approval` set accordingly). The agent **never executes a network change** it only drafts a recommendation.
+8. Emits a structured JSON report with hypotheses, cited evidence, attribution, impact, and any proposed actions (always flagged `read_only` or `change`, with `requires_approval` set accordingly). The agent **never executes a network change**; it only drafts a recommendation.
 
 Five SOPs are covered in the current knowledge base: PCF/policy failures, HSS/UDM subscriber-data failures, backhaul link flaps, RF handover degradation, and multi-cause/customer-impact triage.
 
@@ -124,7 +124,7 @@ This isn't a design doc; it's been run end-to-end on a real AWS account (`eu-nor
 
 This is a proof of concept built to demonstrate one specific architectural pattern end-to-end, not a production NOC tool:
 
-- Knowledge is static reference-file tables (topology, function dependencies, RF neighbour relations) rather than a live, queryable topology service — intentional, matching the blog's reference-layer pattern rather than adding a bespoke graph service.
+- Knowledge is static reference-file tables (topology, function dependencies, RF neighbour relations) rather than a live, queryable topology service, intentionally matching the blog's reference-layer pattern rather than adding a bespoke graph service.
 - Evidence (events, KPIs, changes) comes from a fixed synthetic dataset for a demo network ("Albion Mobile"), not a live OSS/BSS feed.
 - The agent only *drafts* a report and proposed actions; it cannot execute a network change, and every proposed action is explicitly typed `read_only` or `change` with an approval flag.
 - Retrieval is vectorless; a long-tail knowledge base (the blog's third layer) is designed for but not implemented here.
