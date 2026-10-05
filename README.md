@@ -2,7 +2,7 @@
 
 A proof-of-concept AI agent that triages telecom network incidents, correlates alarms, walks through SOPs, and drafts a root-cause report for an engineer, built end-to-end on AWS Bedrock AgentCore.
 
-> 🎬 **Live demo:** [Incident Triage Walkthrough](https://claude.ai/artifact/1ZW6cGpLxXsGpYrGd9Sn9V) An animated, narrated walkthrough of the pipeline, built to explain the architecture without needing AWS console access.
+> 🎬 **Live demo:** [Incident Triage Walkthrough](https://sandesh113.github.io/telecom-incident-triage-agent/demo.html) An animated, narrated walkthrough of the pipeline, built to explain the architecture without needing AWS console access.
 
 ---
 
