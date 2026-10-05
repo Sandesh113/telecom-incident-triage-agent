@@ -21,13 +21,44 @@ It is deliberately scoped as a **PoC for a specific architectural pattern**, not
 
 ## 🏗️ Architecture
 
+
+
+```mermaid
+flowchart LR
+    Alarm["📡 Simulated network alarms<br/>Vendor A / B · LINK-1"]
+    Simulator["💻 Local alarm simulator<br/>Normalize alarms + load synthetic evidence"]
+    Bus["Amazon EventBridge<br/>incident.ready"]
+    Shim["⚡ AWS Lambda shim"]
+    Agent["🤖 Bedrock AgentCore Runtime<br/>Strands agent · 8 tools"]
+    Model["🧠 Amazon Bedrock<br/>Claude Sonnet 4.5"]
+    Knowledge[("📚 Amazon S3<br/>SKILL.md · SOPs · reference files")]
+    Evidence[("🗃️ Amazon DynamoDB<br/>Run-scoped incident evidence")]
+    Reports[("📄 Amazon S3<br/>Structured, cited JSON reports")]
+    SNS["📧 Amazon SNS"]
+    Engineer["👤 On-call engineer<br/>JSON report + S3 pointer"]
+
+    Alarm --> Simulator
+    Simulator -->|"PutItem · evidence ready first"| Evidence
+    Simulator -->|"PutEvents"| Bus
+    Bus -->|"EventBridge rule"| Shim
+    Shim -->|"InvokeAgentRuntime"| Agent
+    Agent -->|"GetObject · vectorless knowledge"| Knowledge
+    Agent <-->|"Model invocation + tool requests"| Model
+    Agent -->|"Query / GetItem · read only"| Evidence
+    Agent -->|"PutObject"| Reports
+    Agent -->|"Publish · report JSON"| SNS
+    SNS -->|"Email"| Engineer
+
+    classDef runtime fill:#103c38,stroke:#2dd4bf,stroke-width:2px,color:#f0fdfa
+    classDef aws fill:#172554,stroke:#60a5fa,color:#eff6ff
+    classDef data fill:#312e81,stroke:#a5b4fc,color:#eef2ff
+    classDef local fill:#3f2c16,stroke:#fbbf24,color:#fffbeb
+    class Agent runtime
+    class Bus,Shim,Model,SNS aws
+    class Knowledge,Evidence,Reports data
+    class Alarm,Simulator,Engineer local
 ```
-📡 EventBridge  →  ⚡ Lambda (shim)  →  🤖 Bedrock AgentCore Runtime  →  🧠 Bedrock (Claude)
-                                          │
-                                          ├─ reads:  📚 S3 knowledge bucket (SKILL.md, SOPs, reference files)
-                                          ├─ reads:  🗃️ DynamoDB evidence table (incident events, KPIs, changes)
-                                          └─ writes: 📄 S3 reports bucket  →  📧 SNS (report-ready notification)
-```
+
 
 | Stage | AWS service | Role |
 |---|---|---|
