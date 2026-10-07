@@ -21,25 +21,25 @@
   Gaps and one misplaced table are logged in ISSUES.md #16-17.
 - **Word source updated to match** (clean docx only): ISSUES.md #14.
 
-### 2026-10-05 — Local investigation candidate
+### 2026-10-05 Local investigation candidate
 - **Scope:** implementation-plan steps 1-2 (normalized incident contract and realistic evidence), then build and test the agent before deployment. USER DECISION. These are not narration steps 1-2; real network-alarm ingestion is not implemented here.
 - **Evidence isolation:** one incident per run UUID, ready marker written last, UTC half-open windows, completeness bounded to the incident window. VERIFIED against SQLite and DynamoDB/moto. Live DynamoDB loading is not yet verified.
 - **Model integration:** Strands 1.57.2, eight explicit application tools and the SDK's structured-output formatter, approved Sonnet model, full SKILL resident in the system prompt. VERIFIED by local Bedrock inference. No topology service or scenario/oracle input.
 - **Guardrails:** read-only evidence wrapper, 40 application-tool calls, one correction attempt, typed provisional report, retrieved citation checks and required approval for proposed changes. VERIFIED by tests. Structural validation does not prove the reasoning; static-reference relationship validity remains a model/evaluator judgement per issue #15.
 - **Deployment boundary:** local ARM64 ZIP build uses `BUILD_ONLY=true`; no upload, Terraform apply or AWS evidence mutation. Existing live smoke skeleton remains deployed. USER DECISION.
 
-### 2026-10-05 — Investigation deployment
+### 2026-10-05 Investigation deployment
 - **Deploy and test on AWS:** USER AUTHORIZATION after the local tests passed. Uploaded the exact local ZIP under a SHA-256-derived `agent-code/` key, changed the gitignored `agent_code_key`, reviewed and applied a saved Terraform plan. VERIFIED: AgentCore DEFAULT is READY on version 3.
 - **Matching event/run pointer:** test-event script accepts the evidence loader's run UUID. Fresh synthetic bundles are loaded into the existing project-tagged DynamoDB table; no new resources, knowledge changes, scenarios or oracle uploads.
 - **Long-running invocation timeout:** SDK read timeout 870 seconds, total_max_attempts=1. VERIFIED regression test; deployed through a separate Lambda-only Terraform plan. The initial 60-second setting repeated agent requests and SNS publishes on the same trace. This fixes SDK retries, not general upstream event idempotency.
 
-### 2026-10-05 — Network alarm simulation
+### 2026-10-05 Network alarm simulation
 - **Operator-side replay, existing AWS pipeline:** raw multi-vendor alarm generation and normalization run in one local command. Evidence is loaded before an alarm-derived incident.ready event is published. No new Lambda, rule, service, topology store or AWS resource. This preserves SKILL's boundary: normalization belongs outside the agent.
 - **Scope is transport:** dictionary 0.2 LINK_DOWN/UP and aliases are verified against current ROUTING, SOP-03 and REF-TX.1–2. Other dictionary families and KPI-derived routing are not implemented by this adapter. The dictionary's older applies_to metadata is unchanged; only these matching transport rules are used.
 - **Synthetic telemetry:** reuse the independently curated, verified transport measurements and shift their event clock to the replay window. Raw alarms alone cannot establish per-cell outcomes/customer impact; those are explicit synthetic support feeds, not conclusions baked into a model prompt.
 - **Safety and provenance:** fresh run UUID, raw capture before normalization, conflicting/unknown alarms fail before AWS writes, simulated ingest headers for accelerated replay, account/project checks before publishing. Raw records and dictionary remain outside agent packaging and knowledge sync.
 
-### 2026-10-05 — SNS email report content
+### 2026-10-05 SNS email report content
 - **Inline investigation JSON:** overrides the earlier pointer-only SNS convention (including CLAUDE rule 8's notification format). Include the complete report findings with incident/run metadata, status and validation errors in plain-text email; preserve the S3 pointer. Tool traces and correction-attempt diagnostics stay in S3.
 - **Message-size guard:** retain compatibility with the topic's default 256 KiB payload size; try formatted then compact JSON. If still too large, explicitly state omission and point to the complete S3 report. No topic configuration or email subscription change. Unit tests verify exact report preservation and byte-size fallback.
 
