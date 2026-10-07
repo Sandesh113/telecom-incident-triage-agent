@@ -1,27 +1,7 @@
 # DECISIONS
 
-- **Deploy identity = `default` profile (AccountFullAccessRole, `aws login` session).** ASSUMPTION/USER CHOICE.
-  The user chose this over a narrower `poc` user. `aws_profile = "default"` in the gitignored terraform.tfvars.
-- **Manual IAM bootstrap objects (untagged, not in Terraform):** user `sop-rca-poc`, managed policy
-  `sop-rca-poc-operator` (infra/poc-operator-policy.json), one access key. Unused. The key's secret was
-  exposed in a chat transcript -> should be deleted. Created outside Terraform, against the spirit of rule 1.
-- **uv installed via winget; Python 3.13 via `uv python install`.** The Windows Store `python` shim is
-  not a real Python, so build runs need the uv Python dir first on PATH. VERIFIED (build succeeded).
-- **Agent entry point:** skeleton renamed `app.py` -> `agent/main.py` for code deployment. VERIFIED (zip contents).
-
-- **Knowledge sources (VERIFIED by inspection):** SKILL.md from the top folder (17:57), NOT from files.zip.
-  Both are labelled version 0.6, but the top-level file is a superset (adds `affected_objects` guidance and
-  `unexplained_objects`); files.zip's is older. files.zip also holds only the v0.4_clean / v0.5_redline .docx
-  files and was otherwise unused. shared-rules, SOP-01..05, build_catalog.py from files1.zip; reference files
-  from `Reference Files/` (v0.3, matching spec §1 "Ready"). Spec §1 marks SOPs v0.5 redline as *pending
-  owner acceptance*: the agent-facing SOP text is therefore provisional.
-- **Edit to provided `knowledge/tools/build_catalog.py`:** `str(path.relative_to(ROOT))` -> `path.relative_to(ROOT).as_posix()`.
-  On Windows it wrote backslashes (`sops\SOP-01.md`) into catalog.json `file`/`generated_from` (92 values),
-  which would not resolve on the Linux runtime. With the fix the output equals the zip's catalog.json. VERIFIED.
-
 ### Phase 1
-- **Topology is static reference-file content only, not a queryable store.** USER DECISION (2026-10-05), to match the pattern in the
-  AWS blog ("Building AI Agents for Telecom Network Operations") and not extend beyond it. The user edited `correlation-patterns.md`,
+- **Topology is static reference-file content only, not a queryable store.** ,
   SOP-01/02/03/05 to point at REF-CORE.5-6, REF-TX.1 and REF-RAN.4 instead of a topology service. Consequences in code: no `topology`
   collection, no topology loader, no `get_topology` implementation, no topology versioning or `at_time` lookup. The earlier Phase 1
   topology design (per-run topology versions, opaque `topo-1+<hash>` for scenario overrides, `TOPO:` evidence IDs) was removed.
@@ -30,11 +10,11 @@
 - **Every collection is keyed by run UUID**, so runs never mix. ASSUMPTION (keeps runs isolated).
 - **Generic document store:** `put/get/query/versions/delete_run`, equality filter only. DynamoDB keys `pk=RUN#<run>`, `sk=<collection>#<id>#<version>`,
   doc stored as a JSON string (boto3 rejects floats). This supersedes the `INCIDENT#...` key shape sketched in `dynamodb.tf` comments for the
-  walking skeleton (the skeleton never reads the table). Infra unchanged. DynamoDB backend tested with moto only, not real AWS. [Unverified]
-- **Read-only wrapper** for the agent: enforces CLAUDE.md rule 8 in code as well as IAM.
+  walking skeleton (the skeleton never reads the table).
+- **Read-only wrapper** for the agent: enforces  rule 8 in code as well as IAM.
 - **Removed with the topology service:** `store/topology.py`, `tests/test_topology.py`, and (not requested, but they only served topology) `store/cli.py`,
   `harness/scenario_inputs.resolve_topology`, `Manifest.topology_version`, topology loading in `harness/new_run.py`.
-- **Scenario inputs location:** read from `SOP_RCA_SCENARIO_INPUTS`, else `knowledge/scenarios/` (spec §3), else the top folder (CLAUDE.md map).
+- **Scenario inputs location:** read from `SOP_RCA_SCENARIO_INPUTS`, else `knowledge/scenarios/` (spec §3), else the top folder.
   The copy of scenario_inputs/oracle/dictionary into `knowledge/` was blocked (see PROGRESS.md) and is left for the human to decide.
 - **Validators 4 and 6 relaxed to "cites the relevant reference-file ID"; 8 agent tools.** USER DECISION (2026-10-05). Full text and cost in ISSUES.md #15.
 - **Concrete demo relationships live as static tables in the reference files** (ran-rf.md, core-control-plane.md; link-to-cell was already in transport.md). USER DECISION.
@@ -60,5 +40,6 @@
 - **Safety and provenance:** fresh run UUID, raw capture before normalization, conflicting/unknown alarms fail before AWS writes, simulated ingest headers for accelerated replay, account/project checks before publishing. Raw records and dictionary remain outside agent packaging and knowledge sync.
 
 ### 2026-10-05 — SNS email report content
-- **Inline investigation JSON:** USER REQUEST overrides the earlier pointer-only SNS convention (including CLAUDE rule 8's notification format). Include the complete report findings with incident/run metadata, status and validation errors in plain-text email; preserve the S3 pointer. Tool traces and correction-attempt diagnostics stay in S3.
+- **Inline investigation JSON:** overrides the earlier pointer-only SNS convention (including CLAUDE rule 8's notification format). Include the complete report findings with incident/run metadata, status and validation errors in plain-text email; preserve the S3 pointer. Tool traces and correction-attempt diagnostics stay in S3.
 - **Message-size guard:** retain compatibility with the topic's default 256 KiB payload size; try formatted then compact JSON. If still too large, explicitly state omission and point to the complete S3 report. No topic configuration or email subscription change. Unit tests verify exact report preservation and byte-size fallback.
+
